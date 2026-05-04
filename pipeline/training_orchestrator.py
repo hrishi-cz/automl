@@ -23,7 +23,6 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 import json
-import hashlib
 
 import torch
 import numpy as np
@@ -61,7 +60,7 @@ from core.context_enforcer import (
     ContextValidator,
     ensure_session_context,
 )
-from core.types import Phase, TrainingConfig, ModelSelectionResult, TrainingMetrics
+from core.types import Phase, TrainingConfig
 
 
 # Configure logging
@@ -483,7 +482,7 @@ class AutoVisionIterableDataset(torch.utils.data.IterableDataset):
 
     def __init__(
         self,
-        file_paths: "List[Union[str, Path]]",
+        file_paths: "List[str | Path]",
         target_column: str,
         schema_info: dict,
         target_encoder=None,
@@ -1445,30 +1444,30 @@ class TrainingOrchestrator:
             "TrainingOrchestrator: injected %d session datasets - Phase 1 will be skipped",
             len(registered),
         )
-    
+
     async def run_pipeline(self) -> Dict[str, Any]:
         """Execute complete 7-phase pipeline (async – Phase 1 is truly async)."""
         self.start_time = time.time()
         logger.info("=" * 80)
         logger.info("APEX AutoML Training Pipeline Starting")
         logger.info("=" * 80)
-        
+
         try:
             # Phase 1: Data Ingestion
             await self._execute_phase_1_data_ingestion()
-            
+
             # Phase 2: Schema Detection
             self._execute_phase_2_schema_detection()
-            
+
             # Phase 3: Preprocessing
             self._execute_phase_3_preprocessing()
-            
+
             # Phase 4: Model Selection
             self._execute_phase_4_model_selection()
-            
+
             # Phase 5: Training
             self._execute_phase_5_training()
-            
+
             # Phase 6: Drift Detection (fault-isolated – failure here
             # must not prevent Phase 7 model registration)
             try:
@@ -1487,14 +1486,14 @@ class TrainingOrchestrator:
 
             # Phase 7: Model Registry
             self._execute_phase_7_model_registry()
-            
+
             elapsed = time.time() - self.start_time
             logger.info("=" * 80)
             logger.info(f"✅ PIPELINE COMPLETE - Total time: {elapsed:.2f}s")
             logger.info("=" * 80)
-            
+
             return self._compile_results(elapsed)
-            
+
         except Exception as e:
             logger.error(f"❌ Pipeline execution failed: {str(e)}")
             raise
@@ -1547,7 +1546,7 @@ class TrainingOrchestrator:
         if isinstance(phase_result, dict):
             return phase_result
         return {"result": phase_result}
-    
+
     async def _execute_phase_1_data_ingestion(
         self,
         sources: Optional[List[str]] = None,
@@ -1656,7 +1655,7 @@ class TrainingOrchestrator:
         except Exception as e:
             logger.error("Phase 1 failed: %s", str(e))
             raise
-    
+
     def _execute_phase_2_schema_detection(self) -> None:
         """
         Phase 2: Schema Detection – infer column types, target, and problem type.
@@ -1719,7 +1718,7 @@ class TrainingOrchestrator:
         except Exception as e:
             logger.error("Phase 2 failed: %s", str(e))
             raise
-    
+
     def _execute_phase_3_preprocessing(self) -> None:
         """
         Phase 3: Preprocessing – materialise datasets, fit transformers, build
@@ -2546,7 +2545,7 @@ class TrainingOrchestrator:
         except Exception as exc:
             logger.error("Phase 3 failed: %s", str(exc))
             raise
-    
+
     def _execute_phase_4_model_selection(self) -> None:
         """
         Phase 4: Model Selection – delegate to ``AdvancedModelSelector`` and
@@ -3132,7 +3131,7 @@ class TrainingOrchestrator:
         except Exception as exc:
             logger.error("Phase 4 failed: %s", str(exc))
             raise
-    
+
     def _execute_phase_5_training(self, hp_overrides: Optional[Dict[str, Any]] = None,
                                     early_stop_patience: int = 5,
                                     progress_callback: Optional[Any] = None) -> None:
@@ -3284,7 +3283,12 @@ class TrainingOrchestrator:
                         if not isinstance(_ds_intel, dict):
                             continue
                         long_tail_cats = [str(v) for v in list(_ds_intel.get("long_tail_cats", []) or [])]
-                        if target_col and str(target_col) in long_tail_cats:
+                        _target_col = (
+                            schema_info.get("primary_target")
+                            or schema_info.get("target_column")
+                            or ""
+                        )
+                        if _target_col and str(_target_col) in long_tail_cats:
                             _use_stratified_kfold = True
                             break
                 except Exception:
@@ -5393,7 +5397,7 @@ class TrainingOrchestrator:
         except Exception as exc:
             logger.error("Phase 5 failed: %s", str(exc))
             raise
-    
+
     def _execute_phase_6_drift_detection(self) -> None:
         """
         Phase 6: Drift Detection – compute KS, PSI, and FDD (MMD) statistics.
@@ -5640,7 +5644,7 @@ class TrainingOrchestrator:
         except Exception as exc:
             logger.error("Phase 6 failed: %s", str(exc))
             raise
-    
+
     def _execute_phase_7_model_registry(self) -> None:
         """
         Phase 7: Model Registry – physically serialise training artifacts.
@@ -6041,7 +6045,7 @@ class TrainingOrchestrator:
         except Exception as exc:
             logger.error("Phase 7 failed: %s", str(exc))
             raise
-    
+
     def _summarize_all_phases(self) -> Dict[str, Any]:
         """Create summary of all phases."""
         ctx = self._get_ctx()
@@ -6103,7 +6107,7 @@ class TrainingOrchestrator:
                     })
                 summary[phase.name] = phase_summary
         return summary
-    
+
     def _compile_results(self, total_elapsed: float) -> Dict[str, Any]:
         """Compile final pipeline results."""
         # Convert Phase enum keys to strings for JSON serialization
@@ -6143,16 +6147,16 @@ if __name__ == "__main__":
         modalities=["image", "text", "tabular"],
         target_column="label"
     )
-    
+
     # Create orchestrator and run pipeline
     orchestrator = TrainingOrchestrator(config)
     results = asyncio.run(orchestrator.run_pipeline())
-    
+
     # Save results
     output_path = Path("pipeline_results.json")
     with open(output_path, 'w') as f:
         json.dump(results, f, indent=2)
-    
+
     logger.info(f"\n✅ Results saved to {output_path}")
 
 

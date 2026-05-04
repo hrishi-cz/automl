@@ -37,7 +37,7 @@ from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 try:
     from pydantic import ConfigDict as _PydanticConfigDict
     _PYDANTIC_V2 = True
@@ -148,7 +148,7 @@ if ALLOW_LEGACY_SESSION_FALLBACK and APEX_MODE == "production":
 def get_session_datasets(session_id: str) -> Dict[str, Any]:
     """
     Load lazy datasets for a session (single source of truth).
-    
+
     Uses context_db (thread-safe, no race conditions).
     """
     from data_ingestion.loader import DataLoader
@@ -169,7 +169,7 @@ def get_session_datasets(session_id: str) -> Dict[str, Any]:
         if not profile:
             logger.warning("Profile not found for dataset %s", dataset_id)
             continue
-        
+
         # Load from cache using hash or path
         hash_id = profile.get('dataset_id')  # dataset_id is the hash
         cache_path = cache_dir / hash_id
@@ -2053,7 +2053,6 @@ async def preprocess_data(request: Request) -> Dict[str, Any]:
     """
     try:
         from data_ingestion.loader import DataLoader
-        from data_ingestion.schema_detector import MultiDatasetSchemaDetector
         from preprocessing.image_preprocessor import ImagePreprocessor
         from preprocessing.text_preprocessor import TextPreprocessor
         from preprocessing.tabular_preprocessor import TabularPreprocessor
@@ -2136,7 +2135,7 @@ async def preprocess_data(request: Request) -> Dict[str, Any]:
             _cache_session_dir = Path(f"./data/session_cache/{_cache_sid}")
             _cache_session_dir.mkdir(parents=True, exist_ok=True)
             _scaler_path = _cache_session_dir / "tabular_scaler.joblib"
-            
+
             # Sample frames for preprocessing — materialise every lazy type to pandas.
             # Priority order mirrors load_cached: LazyFrame > DataFrame > LazyImageDataset > dask.
             # For multimodal CSV datasets (Hateful Memes, MMIMDB) load_cached returns a LazyFrame
@@ -5020,7 +5019,6 @@ async def model_registry_export_onnx(model_id: str, request: Request) -> Dict[st
     """
     model_id = _sanitize_model_id(model_id)
     try:
-        import io
         import torch as _torch
         from pipeline.inference_engine import MultimodalInferenceEngine
         from config.paths import MODEL_REGISTRY_DIR as _MRD
@@ -6046,7 +6044,6 @@ async def predict_multimodal(request: Request) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 from api.session_manager import session_manager
-from core.orchestrator import orchestrator
 from database.context_db import OptimisticLockError, context_db
 
 
@@ -6085,7 +6082,7 @@ class SessionDatasetRequest(BaseModel):
 async def create_session_v2(request: SessionCreateRequest) -> Dict[str, Any]:
     """
     Create a new session (Phase 2).
-    
+
     Returns:
         {
             "session_id": str,
@@ -6099,13 +6096,13 @@ async def create_session_v2(request: SessionCreateRequest) -> Dict[str, Any]:
             project_name=request.project_name,
             description=request.description
         )
-        
+
         return {
             "session_id": ctx.session_id,
             "created_at": ctx.created_at.isoformat(),
             "status": ctx.status
         }
-    
+
     except Exception as exc:
         logger.error("/v2/sessions error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -6115,16 +6112,16 @@ async def create_session_v2(request: SessionCreateRequest) -> Dict[str, Any]:
 async def get_session_v2(session_id: str) -> Dict[str, Any]:
     """
     Get a session by ID (Phase 2).
-    
+
     Returns full SessionContext as dict.
     """
     try:
         ctx = session_manager.get_session(session_id)
         if not ctx:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-        
+
         return ctx.to_dict()
-    
+
     except HTTPException:
         raise
     except Exception as exc:
@@ -6914,13 +6911,13 @@ async def list_sessions_v2(
 ) -> Dict[str, Any]:
     """
     List sessions with optional filtering (Phase 2).
-    
+
     Query params:
         user_id: Filter by user ID
         status: Filter by status (active, closed, error)
         limit: Max sessions to return
         offset: Pagination offset
-    
+
     Returns:
         {
             "sessions": [session_summary, ...],
@@ -6930,12 +6927,12 @@ async def list_sessions_v2(
     try:
         sessions = session_manager.list_sessions(user_id, status, limit, offset)
         total = session_manager.db.get_session_count(user_id, status)
-        
+
         return {
             "sessions": sessions,
             "total": total
         }
-    
+
     except Exception as exc:
         logger.error("/v2/sessions list error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -6945,7 +6942,7 @@ async def list_sessions_v2(
 async def close_session_v2(session_id: str) -> Dict[str, Any]:
     """
     Close a session (Phase 2).
-    
+
     Returns:
         {
             "session_id": str,
@@ -6957,13 +6954,13 @@ async def close_session_v2(session_id: str) -> Dict[str, Any]:
         success = session_manager.close_session(session_id)
         if not success:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-        
+
         return {
             "session_id": session_id,
             "status": "closed",
             "closed_at": datetime.now(timezone.utc).isoformat()
         }
-    
+
     except HTTPException:
         raise
     except OptimisticLockError:
@@ -6980,9 +6977,9 @@ async def add_datasets_to_session_v2(
 ) -> Dict[str, Any]:
     """
     Add datasets to a session (Phase 2).
-    
+
     Starts async ingestion and associates datasets with session.
-    
+
     Returns:
         {
             "task_id": str,
@@ -6995,19 +6992,19 @@ async def add_datasets_to_session_v2(
         ctx = session_manager.get_session(session_id)
         if not ctx:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-        
+
         # Use existing ingestion endpoint logic
         ingestion_req = IngestionRequest(
             dataset_urls=request.dataset_urls,
             session_id=session_id
         )
-        
+
         # Call existing ingestion endpoint
         result = await ingest_datasets_endpoint(ingestion_req)
-        
+
         # Extract task_id
         task_id = result.get("task_id")
-        
+
         return {
             "task_id": task_id,
             "status": "processing",
@@ -7020,7 +7017,7 @@ async def add_datasets_to_session_v2(
                 for url in request.dataset_urls
             ]
         }
-    
+
     except HTTPException:
         raise
     except Exception as exc:
@@ -7035,9 +7032,9 @@ async def remove_dataset_from_session_v2(
 ) -> Dict[str, Any]:
     """
     Remove a dataset from a session's active list (Phase 2).
-    
+
     Dataset remains in cache but is not used for training.
-    
+
     Returns:
         {
             "session_id": str,
@@ -7050,14 +7047,14 @@ async def remove_dataset_from_session_v2(
         success = session_manager.remove_dataset_from_session(session_id, dataset_id)
         if not success:
             raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found in session")
-        
+
         return {
             "session_id": session_id,
             "dataset_id": dataset_id,
             "status": "removed",
             "cache_preserved": True
         }
-    
+
     except HTTPException:
         raise
     except OptimisticLockError:
@@ -7077,7 +7074,7 @@ async def remove_dataset_from_session_v2(
 async def list_session_datasets_v2(session_id: str) -> Dict[str, Any]:
     """
     List all datasets in a session with their status (Phase 3).
-    
+
     Returns:
         {
             "session_id": str,
@@ -7098,9 +7095,9 @@ async def list_session_datasets_v2(session_id: str) -> Dict[str, Any]:
         ctx = session_manager.get_session(session_id)
         if not ctx:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-        
+
         profiles = context_db.get_session_profiles(session_id)
-        
+
         datasets = []
         active_datasets: List[Dict[str, Any]] = []
         cached_datasets: List[Dict[str, Any]] = []
@@ -7128,14 +7125,14 @@ async def list_session_datasets_v2(session_id: str) -> Dict[str, Any]:
                 active_datasets.append(compact)
             else:
                 cached_datasets.append(compact)
-        
+
         return {
             "session_id": session_id,
             "datasets": datasets,
             "active_datasets": active_datasets,
             "cached_datasets": cached_datasets,
         }
-    
+
     except HTTPException:
         raise
     except Exception as exc:
@@ -7147,7 +7144,7 @@ async def list_session_datasets_v2(session_id: str) -> Dict[str, Any]:
 async def get_dataset_schema_v2(dataset_id: str) -> Dict[str, Any]:
     """
     Get schema detection results for a dataset (Phase 3).
-    
+
     Returns:
         {
             "dataset_id": str,
@@ -7161,7 +7158,7 @@ async def get_dataset_schema_v2(dataset_id: str) -> Dict[str, Any]:
         profile = context_db.load_profile(dataset_id)
         if not profile:
             raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
-        
+
         return {
             "dataset_id": dataset_id,
             "schema_detected": profile.get('schema_detected', False),
@@ -7169,7 +7166,7 @@ async def get_dataset_schema_v2(dataset_id: str) -> Dict[str, Any]:
             "confidence": profile.get('schema_confidence', 0.0),
             "evidence": profile.get('schema_evidence')
         }
-    
+
     except HTTPException:
         raise
     except Exception as exc:
@@ -7191,7 +7188,7 @@ async def override_dataset_schema_v2(
 ) -> Dict[str, Any]:
     """
     Override detected schema for a dataset (Phase 3).
-    
+
     Returns:
         {
             "dataset_id": str,
@@ -7234,13 +7231,13 @@ async def override_dataset_schema_v2(
                 request.reason,
             )
             session_manager.update_session_context(session_id, ctx)
-        
+
         return {
             "dataset_id": dataset_id,
             "schema_overridden": True,
             "new_schema": request.schema_override
         }
-    
+
     except HTTPException:
         raise
     except OptimisticLockError:
@@ -7261,7 +7258,7 @@ async def override_dataset_schema_v2(
 async def get_target_candidates_v2(dataset_id: str) -> Dict[str, Any]:
     """
     Get target candidates for a dataset (Phase 4).
-    
+
     Returns:
         {
             "dataset_id": str,
@@ -7289,7 +7286,7 @@ async def get_target_candidates_v2(dataset_id: str) -> Dict[str, Any]:
             if len(ranked_scores) > 1 else
             (ranked_scores[0] if ranked_scores else 0.0)
         )
-        
+
         return {
             "dataset_id": dataset_id,
             "candidates": candidates,
@@ -7297,7 +7294,7 @@ async def get_target_candidates_v2(dataset_id: str) -> Dict[str, Any]:
             "target_locked": profile.get('target_locked', False),
             "xs3_confidence_gap": float(max(0.0, xs3_confidence_gap)),
         }
-    
+
     except HTTPException:
         raise
     except Exception as exc:
@@ -7321,7 +7318,7 @@ async def override_target_v2(
 ) -> Dict[str, Any]:
     """
     Override target selection for a dataset (Phase 4).
-    
+
     Returns:
         {
             "dataset_id": str,
@@ -7574,7 +7571,7 @@ async def unlock_target_v2(dataset_id: str, session_id: str = Query(...)) -> Dic
 async def get_global_schema_v2(session_id: str) -> Dict[str, Any]:
     """
     Get global schema for a session (Phase 5).
-    
+
     Returns:
         {
             "session_id": str,
@@ -7588,7 +7585,7 @@ async def get_global_schema_v2(session_id: str) -> Dict[str, Any]:
         ctx = session_manager.get_session(session_id)
         if not ctx:
             raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-        
+
         return {
             "session_id": session_id,
             "global_schema": ctx.global_schema,
@@ -7596,7 +7593,7 @@ async def get_global_schema_v2(session_id: str) -> Dict[str, Any]:
             "datasets_compatible": ctx.datasets_compatible,
             "compatibility_matrix": ctx.compatibility_matrix
         }
-    
+
     except HTTPException:
         raise
     except Exception as exc:
@@ -7608,7 +7605,7 @@ async def get_global_schema_v2(session_id: str) -> Dict[str, Any]:
 async def get_global_target_v2(session_id: str) -> Dict[str, Any]:
     """
     Get global target for a session (Phase 5).
-    
+
     Returns:
         {
             "session_id": str,
@@ -7635,7 +7632,7 @@ async def get_global_target_v2(session_id: str) -> Dict[str, Any]:
             if len(ranked_scores) > 1 else
             (ranked_scores[0] if ranked_scores else 0.0)
         )
-        
+
         return {
             "session_id": session_id,
             "global_target": ctx.global_target,
@@ -7643,7 +7640,7 @@ async def get_global_target_v2(session_id: str) -> Dict[str, Any]:
             "candidates": ctx.global_target_candidates,
             "xs3_confidence_gap": float(max(0.0, xs3_confidence_gap)),
         }
-    
+
     except HTTPException:
         raise
     except Exception as exc:
@@ -7671,13 +7668,13 @@ async def override_global_target_v2(
         with _session_lock:
             ctx.override_global_target(request.new_target, request.reason)
             session_manager.update_session_context(session_id, ctx)
-        
+
         return {
             "session_id": session_id,
             "global_target": request.new_target,
             "overridden": True
         }
-    
+
     except HTTPException:
         raise
     except OptimisticLockError:
@@ -7719,13 +7716,13 @@ async def choose_primary_dataset_v2(
                 request.reason,
             )
             session_manager.update_session_context(session_id, ctx)
-        
+
         return {
             "session_id": session_id,
             "primary_dataset_id": request.dataset_id,
             "reason": request.reason
         }
-    
+
     except HTTPException:
         raise
     except OptimisticLockError:
@@ -7758,8 +7755,7 @@ async def override_target_per_modality(
     and runs the appropriate per-modality validator (G10 for text, G11 for image).
     """
     try:
-        _require_session(session_id)
-        ctx = _load_session_required(session_id)
+        ctx = _get_session_context_or_422(session_id, "modality_target_override")
 
         modality = str(request.modality or "").strip().lower()
         if modality not in {"text", "image", "tabular"}:
@@ -7982,8 +7978,7 @@ async def set_active_prediction_model(
     Writes to ``ctx.active_prediction_model_id`` and logs the decision.
     """
     try:
-        _require_session(session_id)
-        ctx = _load_session_required(session_id)
+        ctx = _get_session_context_or_422(session_id, "set_active_model")
 
         model_id = str(request.model_id or "").strip()
         if not model_id or not _SAFE_MODEL_ID.match(model_id):
@@ -8023,8 +8018,7 @@ async def list_registered_models(session_id: str):
     G22: List all models registered in a session, with the active model marked.
     """
     try:
-        _require_session(session_id)
-        ctx = _load_session_required(session_id)
+        ctx = _get_session_context_or_422(session_id, "list_session_models")
 
         registered = list(getattr(ctx, "registered_model_ids", []) or [])
         active = getattr(ctx, "active_prediction_model_id", None)
@@ -8070,7 +8064,7 @@ async def list_registered_models(session_id: str):
 
 if __name__ == "__main__":
     print("Starting APEX Framework API Server...")
-    print(f"API: http://localhost:8001")
+    print("API: http://localhost:8001")
     print(f"GPU: {GPU_DEVICE if GPU_AVAILABLE else 'CPU (no GPU)'}")
 
     uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")
