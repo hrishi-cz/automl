@@ -6,7 +6,7 @@ key components (fusion, XAI, etc.) to quantify their contribution.
 """
 
 import logging
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -14,17 +14,17 @@ logger = logging.getLogger(__name__)
 def build_ablation(experiments: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Build ablation study from experiments.
-    
+
     Compares:
     1. With fusion vs. without fusion → contribution of fusion strategy
     2. With XAI vs. without XAI → contribution of explainability
     3. Different modality combinations → modality contribution
-    
+
     Parameters
     ----------
     experiments : List[Dict]
         Output from ExperimentCollector.collect().
-    
+
     Returns
     -------
     Dict with ablation results:

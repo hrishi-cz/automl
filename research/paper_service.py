@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class PaperService:
     """
     End-to-end paper generation service.
-    
+
     Usage:
         service = PaperService(registry_dir="models/registry")
         paper_text, plot_path = service.generate()
@@ -40,7 +40,7 @@ class PaperService:
     def generate(self) -> Tuple[str, Optional[str]]:
         """
         Generate complete research paper.
-        
+
         Returns
         -------
         Tuple[str, Optional[str]]

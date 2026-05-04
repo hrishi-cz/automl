@@ -200,7 +200,7 @@ class DataIngestionManager:
                 logger.error("Ingestion returned None for [%s]", source)
             else:
                 lazy_ref, cache_path = result
-                
+
                 # Wrap in DatasetObject with metadata
                 ingestion_meta = self.cache_metadata.get(
                     source_hash,
@@ -211,7 +211,7 @@ class DataIngestionManager:
                     lazy_data=lazy_ref,
                     metadata=ingestion_meta,
                 )
-                
+
                 # Validate before adding to results
                 try:
                     validate_dataset(dataset_obj)
@@ -244,7 +244,7 @@ class DataIngestionManager:
         Backward compatibility: if the normalised hash produces a cache miss,
         falls back to the legacy (raw-string) hash.  If found under the legacy
         key the metadata is migrated to the new normalised key in-place.
-        
+
         Note: Returns raw lazy_ref here (not DatasetObject). Wrapping happens
         in ingest_data() after all ingestion is complete.
         """
@@ -502,7 +502,7 @@ class DataIngestionManager:
         """
         kaggle_username: Optional[str] = os.getenv("KAGGLE_USERNAME")
         kaggle_key: Optional[str] = os.getenv("KAGGLE_KEY")
-        
+
         # Fallback: read from ~/.kaggle/kaggle.json if env vars not set
         if not kaggle_username or not kaggle_key:
             kaggle_json_path = Path.home() / ".kaggle" / "kaggle.json"
@@ -515,7 +515,7 @@ class DataIngestionManager:
                         logger.info("Loaded Kaggle credentials from ~/.kaggle/kaggle.json")
                 except Exception as e:
                     logger.warning("Failed to read kaggle.json: %s", e)
-        
+
         if not kaggle_username or not kaggle_key:
             raise EnvironmentError(
                 "Kaggle credentials missing. "
@@ -600,14 +600,14 @@ class DataIngestionManager:
                     zref.extractall(temp_dir)
             csv_files = list(temp_dir.rglob("*.csv"))
             image_files = list(temp_dir.rglob("*.jpg")) + list(temp_dir.rglob("*.jpeg")) + list(temp_dir.rglob("*.png"))
-            
+
             if not csv_files and not image_files:
                 raise RuntimeError(
                     f"No CSV or Images found in Kaggle archive for {dataset_id}."
                 )
-                
+
             cache_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Universal Multimodal Extraction: move EVERYTHING from the Kaggle Zip directly to the cache folder!
             for item in temp_dir.iterdir():
                 dest = cache_path / item.name

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class ExperimentCollector:
     """
     Scans model registry and collects all experiment metadata.
-    
+
     Usage:
         collector = ExperimentCollector(registry_dir="models/registry")
         experiments = collector.collect()
@@ -164,7 +164,7 @@ class ExperimentCollector:
     def collect(self) -> List[Dict[str, Any]]:
         """
         Scan registry and collect all experiment metadata.
-        
+
         Returns
         -------
         List[Dict] with entries:
@@ -247,14 +247,14 @@ class ExperimentCollector:
     ) -> Dict[str, Any]:
         """
         Find the best-performing experiment by a given metric.
-        
+
         Parameters
         ----------
         experiments : List[Dict] | None
             Output from collect(). If omitted, collect() is called.
         metric : str
             Metric key to optimize (default "accuracy").
-        
+
         Returns
         -------
         Dict : Best experiment or empty dict if none found.

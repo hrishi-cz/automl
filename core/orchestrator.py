@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class PipelineOrchestrator:
     """
     Coordinates metadata-centric orchestration phases.
-    
+
     Responsibilities:
     - Load/save ExecutionContext from database
     - Orchestrate metadata phase execution
@@ -45,7 +45,7 @@ class PipelineOrchestrator:
     - Update context with results
     - Ensure context validation before next phase
     """
-    
+
     def __init__(self):
         """Initialize orchestrator with core components."""
         self.schema_detector = MultiDatasetSchemaDetector()
@@ -156,21 +156,21 @@ class PipelineOrchestrator:
                 exc,
             )
             return None
-    
+
     # ===== Context Lifecycle =====
-    
+
     def load_or_create_context(self, session_id: str) -> ExecutionContext:
         """Load context from DB or create new."""
         data = context_db.load_context(session_id)
         if data:
             logger.info("Loaded context for session %s", session_id)
             return ExecutionContext.from_dict(data)
-        
+
         logger.info("Creating new context for session %s", session_id)
         ctx = create_execution_context(session_id)
         self.save_context(ctx)
         return ctx
-    
+
     def save_context(self, ctx: ExecutionContext) -> None:
         """Persist context to database."""
         expected_revision = int(getattr(ctx, "revision", 0) or 0)
@@ -179,14 +179,14 @@ class PipelineOrchestrator:
             expected_revision=expected_revision,
         )
         logger.info("Saved context for session %s", ctx.session_id)
-    
+
     def save_profile(self, profile: DatasetProfile, session_id: str) -> None:
         """Persist dataset profile to database."""
         context_db.save_profile(profile.to_dict(), session_id)
         logger.info("Saved profile for dataset %s", profile.dataset_id)
-    
+
     # ===== Phase 1: Data Ingestion (Post-Processing) =====
-    
+
     def register_ingested_datasets(
         self,
         ctx: ExecutionContext,
@@ -195,7 +195,7 @@ class PipelineOrchestrator:
         """
         Called after DataIngestionManager completes.
         Creates DatasetProfile for each ingested dataset.
-        
+
         Args:
             ctx: Current execution context
             ingested_hashes: {hash: {source, file_path, ...}}
@@ -205,23 +205,23 @@ class PipelineOrchestrator:
             if ctx.get_dataset_profile(dataset_id):
                 logger.info("Dataset %s already registered, skipping", dataset_id)
                 continue
-            
+
             # Create profile
             profile = DatasetProfile(
                 dataset_id=dataset_id,
                 source_url=metadata.get('source'),
                 file_path=metadata.get('file_path')
             )
-            
+
             ctx.add_dataset_profile(profile)
             self.save_profile(profile, ctx.session_id)
-        
+
         ctx.set_pipeline_stage('ingestion_complete')
         self.save_context(ctx)
         logger.info("Registered %d datasets to context", len(ingested_hashes))
-    
+
     # ===== Phase 2: Schema Detection =====
-    
+
     def execute_phase_2_schema(
         self,
         ctx: ExecutionContext,
@@ -229,7 +229,7 @@ class PipelineOrchestrator:
     ) -> None:
         """
         Execute Phase 2: Schema Detection.
-        
+
         Updates each DatasetProfile with schema information.
         """
         ctx.set_pipeline_stage('schema_detection')
@@ -429,7 +429,7 @@ class PipelineOrchestrator:
                 profile.schema_detected = False
                 profile.schema_result = {"error": str(e)}
                 self.save_profile(profile, ctx.session_id)
-        
+
         # Aggregate semantic intelligence from all per-dataset IndividualSchema dicts
         # into ctx.feature_intelligence so every downstream phase can read it.
         try:
@@ -443,7 +443,7 @@ class PipelineOrchestrator:
         logger.info("Phase 2 (Schema Detection) complete for session %s", ctx.session_id)
 
     # ===== Phase 3: Target Detection =====
-    
+
     def execute_phase_3_target(
         self,
         ctx: ExecutionContext,
@@ -451,7 +451,7 @@ class PipelineOrchestrator:
     ) -> None:
         """
         Execute Phase 3: Target Detection.
-        
+
         Updates each DatasetProfile with target candidates.
         """
         ctx.set_pipeline_stage('target_detection')
@@ -461,12 +461,12 @@ class PipelineOrchestrator:
             if not profile:
                 logger.warning("No profile for dataset %s, skipping target detection", dataset_id)
                 continue
-            
+
             # Skip if target locked
             if profile.target_locked:
                 logger.info("Target locked for %s, skipping detection", dataset_id)
                 continue
-            
+
             try:
                 schema_result = profile.schema_result or {}
                 chosen_target = schema_result.get('target_column')
@@ -530,12 +530,12 @@ class PipelineOrchestrator:
 
             except Exception as e:
                 logger.error("Target detection failed for %s: %s", dataset_id, e, exc_info=True)
-        
+
         self.save_context(ctx)
         logger.info("Phase 3 (Target Detection) complete for session %s", ctx.session_id)
-    
+
     # ===== Phase 4: Global Aggregation =====
-    
+
     def execute_phase_4_aggregation(
         self,
         ctx: ExecutionContext,
@@ -543,16 +543,16 @@ class PipelineOrchestrator:
     ) -> None:
         """
         Execute Phase 4: Global Aggregation.
-        
+
         Infers global schema and target across all datasets.
         """
         ctx.set_pipeline_stage('global_aggregation')
-        
+
         profiles = ctx.get_active_profiles()
         if not profiles:
             logger.warning("No active profiles for aggregation")
             return
-        
+
         targets = [
             p.chosen_target
             for p in profiles
@@ -572,13 +572,13 @@ class PipelineOrchestrator:
                 }
                 for target, count in ordered
             ]
-            
+
             ctx.set_global_target(
                 most_common_target,
                 confidence,
                 global_candidates,
             )
-        
+
         # Mark as compatible if same target
         ctx.datasets_compatible = len(set(targets)) == 1 if targets else False
         ctx.compatibility_matrix = {
@@ -590,12 +590,12 @@ class PipelineOrchestrator:
             f"Post-aggregation compatibility: {bool(ctx.datasets_compatible)}",
             evidence=f"primary_dataset_id={ctx.primary_dataset_id}",
         )
-        
+
         self.save_context(ctx)
         logger.info("Phase 4 (Global Aggregation) complete for session %s", ctx.session_id)
-    
+
     # ===== Phase 5: Preprocessing Planning =====
-    
+
     def execute_phase_5_preprocessing(
         self,
         ctx: ExecutionContext,
@@ -603,7 +603,7 @@ class PipelineOrchestrator:
     ) -> None:
         """
         Execute Phase 5: Preprocessing Planning.
-        
+
         Creates preprocessing plan for each dataset.
         """
         ctx.set_pipeline_stage('preprocessing_planning')
@@ -664,7 +664,7 @@ class PipelineOrchestrator:
         global_schema_context: Dict[str, Any] = dict(context_signals.get("global_schema", {}) or {})
 
         dataset_plans: Dict[str, Dict[str, Any]] = {}
-        
+
         for dataset_id, data in data_map.items():
             profile = ctx.get_dataset_profile(dataset_id)
             if not profile or not profile.schema_detected:
@@ -725,7 +725,7 @@ class PipelineOrchestrator:
             xs3_gap = reasoning.get('xs3_confidence_gap', reasoning.get('confidence_gap'))
             if xs3_gap is not None:
                 plan['xs3_confidence_gap'] = float(xs3_gap)
-            
+
             profile.preprocessing_plan = plan
             dataset_plans[dataset_id] = dict(plan)
             self.save_profile(profile, ctx.session_id)

@@ -19,11 +19,10 @@ ICLR 2022.  https://arxiv.org/abs/2106.09685
 from __future__ import annotations
 
 import logging
-from typing import Dict, Iterable, Iterator, Optional, Sequence, Tuple
+from typing import Dict, Iterator, Optional, Sequence, Tuple
 
 import torch  # noqa: F401 — needed for type hint in property
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 

@@ -332,7 +332,6 @@ def _run_tfidf_lr(csv_path: str, seed: int) -> Dict[str, Any]:
 def _run_pixel_mlp(csv_path: str, seed: int, quick: bool = False) -> Dict[str, Any]:
     import torch
     import torch.nn as nn
-    from sklearn.model_selection import train_test_split
     from sklearn.metrics import accuracy_score, f1_score
     from PIL import Image
     from torch.utils.data import DataLoader, TensorDataset

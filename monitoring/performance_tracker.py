@@ -9,10 +9,10 @@ import numpy as np
 
 class PerformanceTracker:
     """Track model performance over time."""
-    
+
     _instances: "weakref.WeakValueDictionary[str, PerformanceTracker]" = weakref.WeakValueDictionary()
     _lock = threading.Lock()
-    
+
     def __new__(cls, model_id: str = "default", max_history: int = 5000):
         existing = cls._instances.get(model_id)
         if existing is not None:
@@ -25,7 +25,7 @@ class PerformanceTracker:
             instance._initialized = False
             cls._instances[model_id] = instance
             return instance
-    
+
     def __init__(self, model_id: str = "default", max_history: int = 5000):
         if hasattr(self, '_initialized') and self._initialized:
             return
@@ -34,7 +34,7 @@ class PerformanceTracker:
         self.metrics = {}
         self.history = []
         self._initialized = True
-    
+
     def log_prediction(self, prediction: np.ndarray, actual: np.ndarray, timestamp: Optional[str] = None):
         """Log a prediction with actual value."""
         if timestamp is None:
@@ -52,7 +52,7 @@ class PerformanceTracker:
             raise ValueError(
                 f"prediction and actual row counts must match (got {pred_rows} vs {actual_rows})"
             )
-        
+
         # Calculate metrics
         if actual.ndim == 1 and prediction.ndim == 1:  # Regression or binary
             mse = np.mean((prediction - actual) ** 2)
@@ -88,7 +88,7 @@ class PerformanceTracker:
         }
         if not metrics:
             return
-        
+
         entry = {
             "timestamp": timestamp,
             "metrics": metrics,
@@ -98,21 +98,21 @@ class PerformanceTracker:
         if overflow > 0:
             del self.history[:overflow]
         self.metrics = metrics
-    
+
     def get_recent_metrics(self, limit: int = 20) -> List[Dict]:
         """Get recent performance metrics."""
         if limit <= 0:
             return []
         return self.history[-limit:] if self.history else []
-    
+
     def get_metric_trend(self, metric_name: str, hours: int = 24) -> List[Dict]:
         """Get trend for a specific metric over time."""
         if not self.history:
             return []
-        
+
         cutoff_time = datetime.now() - timedelta(hours=max(1, int(hours)))
         trend = []
-        
+
         for entry in self.history:
             try:
                 entry_time = datetime.fromisoformat(entry["timestamp"])
@@ -123,14 +123,14 @@ class PerformanceTracker:
                     "timestamp": entry["timestamp"],
                     "value": entry["metrics"][metric_name]
                 })
-        
+
         return trend
-    
+
     def get_performance_summary(self) -> Dict:
         """Get summary of performance metrics."""
         if not self.history:
             return {}
-        
+
         # Calculate averages
         all_metrics = [h["metrics"] for h in self.history]
         summary = {}
@@ -145,7 +145,7 @@ class PerformanceTracker:
                     "max": float(np.max(values)),
                 }
         return summary
-    
+
     def update_prediction_distribution(
         self,
         predictions: np.ndarray,

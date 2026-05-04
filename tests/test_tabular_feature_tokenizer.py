@@ -1,6 +1,5 @@
 """Tests for TabularFeatureTokenizer in preprocessing/tabular_preprocessor.py."""
 
-import pytest
 import torch
 
 from preprocessing.tabular_preprocessor import TabularFeatureTokenizer

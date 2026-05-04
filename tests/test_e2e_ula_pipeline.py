@@ -1,9 +1,6 @@
 """End-to-end integration tests for ULA token-mode pipeline wiring."""
 
-import pytest
-import torch
 import torch.nn as nn
-import numpy as np
 
 
 class TestULATokenModeFlag:
@@ -94,7 +91,7 @@ class TestLoRaWarmStartPresence:
         from modelss.adapters.lora import LoRALinear
 
         text_enc = _make_fake_text_encoder()
-        module = build_trainer(
+        build_trainer(
             problem_type="classification_binary",
             num_classes=2,
             input_dims={"text_pooled": 768},
@@ -109,7 +106,7 @@ class TestLoRaWarmStartPresence:
         from modelss.adapters.lora import lora_parameters
 
         text_enc = _make_fake_text_encoder()
-        module = build_trainer(
+        build_trainer(
             problem_type="classification_binary",
             num_classes=2,
             input_dims={"text_pooled": 768},

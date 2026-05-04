@@ -21,7 +21,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 
 import pandas as pd
 import requests
@@ -395,7 +395,7 @@ def render_target_management(sid: str) -> None:
 
             # Target candidates
             with col1:
-                if st.button(f"View Candidates", key=f"tc_{ds_id}"):
+                if st.button("View Candidates", key=f"tc_{ds_id}"):
                     cands = _safe_get(
                         ep.dataset_target_candidates(ds_id),
                         "target candidates"
@@ -414,7 +414,7 @@ def render_target_management(sid: str) -> None:
 
             # Lock/unlock
             with col2:
-                if st.button(f"🔒 Lock", key=f"lock_{ds_id}"):
+                if st.button("🔒 Lock", key=f"lock_{ds_id}"):
                     _safe_post(
                         ep.dataset_lock_target(ds_id),
                         {"session_id": sid},
@@ -423,7 +423,7 @@ def render_target_management(sid: str) -> None:
                     st.success("Target locked")
 
             with col3:
-                if st.button(f"🔓 Unlock", key=f"unlock_{ds_id}"):
+                if st.button("🔓 Unlock", key=f"unlock_{ds_id}"):
                     _safe_post(
                         ep.dataset_unlock_target(ds_id),
                         {"session_id": sid},

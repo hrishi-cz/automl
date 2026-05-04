@@ -18,7 +18,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -82,7 +82,7 @@ def plot_ablation_bar_chart(plt) -> None:
     stds = [0.02, 0.02, 0.03, 0.03, 0.02, 0.03, 0.05]
 
     colors = ["#2ecc71" if i == 0 else "#3498db" for i in range(len(conditions))]
-    bars = ax.bar(conditions, means, yerr=stds, capsize=4, color=colors,
+    ax.bar(conditions, means, yerr=stds, capsize=4, color=colors,
                   edgecolor="white", linewidth=0.8)
 
     ax.set_ylabel("Accuracy")
@@ -151,7 +151,6 @@ def plot_accuracy_vs_latency(plt) -> None:
     }
 
     for name, (lat, acc) in systems.items():
-        marker = "★" if "APEX" in name else "o"
         size = 200 if "APEX" in name else 80
         color = "#e74c3c" if "APEX" in name else "#3498db"
         ax.scatter(lat, acc, s=size, c=color, zorder=5, edgecolors="white", linewidth=1.5)

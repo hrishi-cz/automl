@@ -8,7 +8,6 @@ Integrates paper generation into the monitoring workflow.
 
 import logging
 import os
-import json
 from typing import Any, Dict, Optional
 from datetime import datetime
 
@@ -32,13 +31,13 @@ except Exception:
 class MonitoringEngine:
     """
     Post-training monitoring with automatic report generation.
-    
+
     Triggers:
     - Accuracy drops below threshold → auto-generate paper
     - Calibration (ECE) exceeds threshold → auto-generate paper
     - Drift detected → auto-generate paper
     - Retrain completed → auto-generate paper
-    
+
     Usage:
         monitor = MonitoringEngine()
         result = monitor.evaluate_and_report(model_id, metrics)
@@ -144,16 +143,16 @@ class MonitoringEngine:
 
         # Build report content
         report_lines = [
-            f"# Monitoring Report\n",
+            "# Monitoring Report\n",
             f"**Model ID**: {model_id}\n",
             f"**Generated**: {datetime.now().isoformat()}\n\n",
-            f"## Alerts\n",
+            "## Alerts\n",
         ]
 
         for alert in alerts:
             report_lines.append(f"- {alert}\n")
 
-        report_lines.append(f"\n## Metrics\n")
+        report_lines.append("\n## Metrics\n")
         for key, val in metrics.items():
             report_lines.append(f"- **{key}**: {val:.4f}\n")
 
@@ -164,7 +163,7 @@ class MonitoringEngine:
                 service = PaperService(registry_dir=self.registry_dir)
                 paper_text, plot_path = service.generate()
 
-                report_lines.append(f"\n## Full Research Paper\n")
+                report_lines.append("\n## Full Research Paper\n")
                 report_lines.append(paper_text)
 
                 if plot_path:

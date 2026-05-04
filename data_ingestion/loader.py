@@ -33,7 +33,6 @@ if not _POLARS_AVAILABLE:
 else:
     _DASK_AVAILABLE = False
 
-import torch
 from torch.utils.data import Dataset
 from PIL import Image
 
@@ -149,7 +148,6 @@ class LazyImageDataset(Dataset):
             _size = (224, 224)
             if self._transform is not None:
                 try:
-                    import torchvision.transforms as _tv
                     for _t in getattr(self._transform, "transforms", []):
                         if hasattr(_t, "size"):
                             _s = _t.size

@@ -2,13 +2,10 @@
 
 import json
 import logging
-import tempfile
 from pathlib import Path
 
-import numpy as np
 import pytest
 import torch
-import torch.nn as nn
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +141,6 @@ class TestMissingEncoderWarning:
 
     def test_missing_text_encoder_logs_warning(self, tmp_path, caplog):
         engine = self._minimal_engine(tmp_path, {"text_pooled": 768, "tabular": 8})
-        import pandas as pd
         inputs = [{"tabular_0": 1.0, "tabular_1": 0.0}]
         with caplog.at_level(logging.WARNING, logger="pipeline.inference_engine"):
             engine._build_batch(inputs)
@@ -187,7 +183,6 @@ class TestImagePathFailureRate:
     def test_all_invalid_paths_emits_warning(self, caplog):
         """When all image paths are invalid, a WARNING should be logged."""
         engine = self._minimal_engine_with_image_prep()
-        import pandas as pd
         inputs = [
             {"image_path": "/nonexistent/fake1.jpg"},
             {"image_path": "/nonexistent/fake2.jpg"},

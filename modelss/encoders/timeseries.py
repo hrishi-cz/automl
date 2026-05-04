@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 from typing import Tuple
 
-import torch
 import torch.nn as nn
 from torch import Tensor
 

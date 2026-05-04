@@ -5,8 +5,6 @@ import json
 import tempfile
 import os
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, List
 from research.experiment_collector import ExperimentCollector
 from research.ablation import build_ablation, _compare_groups, format_ablation_table
 from research.paper_generator import PaperGenerator
@@ -58,12 +56,12 @@ class TestExperimentCollector:
         with tempfile.TemporaryDirectory() as tmpdir:
             registry_dir = Path(tmpdir) / "registry"
             registry_dir.mkdir()
-            
+
             for exp in sample_experiments:
                 exp_file = registry_dir / f"{exp['model_id']}_metadata.json"
                 with open(exp_file, "w") as f:
                     json.dump(exp, f)
-            
+
             yield str(registry_dir)
 
     def test_collector_initialization(self, temp_registry):
@@ -75,10 +73,10 @@ class TestExperimentCollector:
         """Test collect() returns all experiments from registry."""
         collector = ExperimentCollector(registry_dir=temp_registry)
         experiments = collector.collect()
-        
+
         assert isinstance(experiments, list)
         assert len(experiments) >= 2
-        
+
         # Check that experiments have required keys
         for exp in experiments:
             assert "model_id" in exp
@@ -88,7 +86,7 @@ class TestExperimentCollector:
         """Test get_best_experiment returns highest accuracy model."""
         collector = ExperimentCollector(registry_dir=temp_registry)
         best = collector.get_best_experiment(metric="accuracy")
-        
+
         assert best is not None
         assert best["accuracy"] == 0.95  # First experiment has highest accuracy
 
@@ -96,7 +94,7 @@ class TestExperimentCollector:
         """Test get_best_experiment works with different metrics."""
         collector = ExperimentCollector(registry_dir=temp_registry)
         best = collector.get_best_experiment(metric="f1")
-        
+
         assert best is not None
         # Verify it's actually the best F1 score
         assert best["f1"] == max(exp["f1"] for exp in sample_experiments)
@@ -105,9 +103,9 @@ class TestExperimentCollector:
         """Test filtering experiments by modality."""
         collector = ExperimentCollector(registry_dir=temp_registry)
         # Create additional experiments with different modalities
-        
+
         tabular_exps = collector.get_experiments_by_modality("tabular")
-        
+
         assert isinstance(tabular_exps, list)
         # Check that all returned experiments contain tabular modality
         for exp in tabular_exps:
@@ -119,7 +117,7 @@ class TestExperimentCollector:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = ExperimentCollector(registry_dir=tmpdir)
             experiments = collector.collect()
-            
+
             assert isinstance(experiments, list)
             assert len(experiments) == 0
 
@@ -163,7 +161,7 @@ class TestAblation:
     def test_build_ablation_structure(self, sample_experiments_with_ablations):
         """Test build_ablation returns correct structure."""
         ablation = build_ablation(sample_experiments_with_ablations)
-        
+
         assert isinstance(ablation, dict)
         assert "fusion_impact" in ablation or "ablation" in ablation
 
@@ -171,9 +169,9 @@ class TestAblation:
         """Test _compare_groups calculates deltas correctly."""
         with_component = [{"accuracy": 0.95, "f1": 0.94}]
         without_component = [{"accuracy": 0.90, "f1": 0.89}]
-        
+
         comparison = _compare_groups(with_component, without_component)
-        
+
         assert isinstance(comparison, dict)
         assert "with_mean" in comparison or "accuracy_delta" in comparison
 
@@ -181,16 +179,16 @@ class TestAblation:
         """Test _compare_groups handles empty groups gracefully."""
         with_component = [{"accuracy": 0.95}]
         without_component = []
-        
+
         comparison = _compare_groups(with_component, without_component)
-        
+
         assert isinstance(comparison, dict)
 
     def test_format_ablation_table(self, sample_experiments_with_ablations):
         """Test ablation table formatting produces markdown."""
         ablation = build_ablation(sample_experiments_with_ablations)
         table = format_ablation_table(ablation)
-        
+
         # Should return markdown table
         assert isinstance(table, str)
         # Markdown tables contain pipes
@@ -226,13 +224,13 @@ class TestPaperGenerator:
     def test_paper_generator_initialization(self, sample_experiments_for_paper):
         """Test PaperGenerator initializes with experiment data."""
         ablation = build_ablation(sample_experiments_for_paper)
-        
+
         generator = PaperGenerator(
             experiments=sample_experiments_for_paper,
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         assert generator.experiments == sample_experiments_for_paper
         assert generator.ablation == ablation
 
@@ -244,9 +242,9 @@ class TestPaperGenerator:
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         title = generator.generate_title()
-        
+
         assert isinstance(title, str)
         assert len(title) > 0
         assert "iris" in title.lower() or "AutoVision" in title or "autovision" in title.lower()
@@ -259,9 +257,9 @@ class TestPaperGenerator:
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         abstract = generator.generate_abstract()
-        
+
         assert isinstance(abstract, str)
         assert len(abstract) > 100  # Should be substantial
         assert any(keyword in abstract.lower() for keyword in ["accuracy", "dataset", "model"])
@@ -274,9 +272,9 @@ class TestPaperGenerator:
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         methodology = generator.generate_methodology()
-        
+
         assert isinstance(methodology, str)
         assert len(methodology) > 50
         assert any(keyword in methodology.lower() for keyword in ["fusion", "loss", "modality"])
@@ -289,9 +287,9 @@ class TestPaperGenerator:
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         results = generator.generate_results()
-        
+
         assert isinstance(results, str)
         assert len(results) > 50
         # Should contain performance metrics
@@ -305,9 +303,9 @@ class TestPaperGenerator:
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         ablation_section = generator.generate_ablation()
-        
+
         assert isinstance(ablation_section, str)
         assert len(ablation_section) > 0
 
@@ -319,13 +317,13 @@ class TestPaperGenerator:
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         paper = generator.generate_full_paper()
-        
+
         # Full paper should be markdown
         assert isinstance(paper, str)
         assert len(paper) > 500  # Substantial document
-        
+
         # Should contain key sections
         assert "#" in paper  # Has headers
         # Check for multiple sections
@@ -349,16 +347,16 @@ class TestPaperGenerator:
                 # Missing F1 and others
             },
         ]
-        
+
         ablation = build_ablation(incomplete_experiments)
         generator = PaperGenerator(
             experiments=incomplete_experiments,
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         paper = generator.generate_full_paper()
-        
+
         # Should still generate paper, handling missing metrics gracefully
         assert isinstance(paper, str)
         assert len(paper) > 0
@@ -386,15 +384,15 @@ class TestPlotGeneration:
     def test_accuracy_latency_plot_generation(self, sample_plot_experiments):
         """Test accuracy vs latency plot generation."""
         pytest.importorskip("matplotlib")
-        
+
         plot_path = None
         try:
             import tempfile
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
                 plot_path = f.name
-            
+
             plot_path = generate_accuracy_latency_plot(sample_plot_experiments, plot_path)
-            
+
             if plot_path:
                 assert os.path.exists(plot_path) or isinstance(plot_path, str)
         finally:
@@ -407,7 +405,7 @@ class TestPlotGeneration:
     def test_calibration_plot_generation(self, sample_plot_experiments):
         """Test calibration (ECE/Brier) plot generation."""
         pytest.importorskip("matplotlib")
-        
+
         try:
             plot_path = generate_calibration_plot(sample_plot_experiments, "/tmp/calib.png")
             assert plot_path is not None or isinstance(plot_path, (str, type(None)))
@@ -418,7 +416,7 @@ class TestPlotGeneration:
     def test_fusion_comparison_plot_generation(self, sample_plot_experiments):
         """Test fusion strategy comparison plot."""
         pytest.importorskip("matplotlib")
-        
+
         try:
             plot_path = generate_fusion_comparison_plot(sample_plot_experiments, "/tmp/fusion.png")
             assert plot_path is not None or isinstance(plot_path, (str, type(None)))
@@ -439,14 +437,14 @@ class TestPaperEdgeCases:
                 "f1": 0.84,
             }
         ]
-        
+
         ablation = build_ablation(experiments)
         generator = PaperGenerator(
             experiments=experiments,
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         paper = generator.generate_full_paper()
         assert isinstance(paper, str)
         assert len(paper) > 0
@@ -454,14 +452,14 @@ class TestPaperEdgeCases:
     def test_paper_with_no_experiments(self):
         """Test paper generation with empty experiment list."""
         experiments = []
-        
+
         ablation = build_ablation(experiments)
         generator = PaperGenerator(
             experiments=experiments,
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         # Should handle gracefully (return stub or error message)
         paper = generator.generate_full_paper()
         assert isinstance(paper, str)
@@ -469,14 +467,14 @@ class TestPaperEdgeCases:
     def test_paper_section_independence(self):
         """Test that paper sections can be generated independently."""
         experiments = [{"model_id": "exp1", "accuracy": 0.90, "f1": 0.89}]
-        
+
         ablation = build_ablation(experiments)
         generator = PaperGenerator(
             experiments=experiments,
             ablation=ablation,
             plot_path="/tmp/plots.png"
         )
-        
+
         # Each section should be callable independently
         assert isinstance(generator.generate_title(), str)
         assert isinstance(generator.generate_abstract(), str)

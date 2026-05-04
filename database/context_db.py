@@ -30,14 +30,14 @@ class OptimisticLockError(RuntimeError):
 class ContextDatabase:
     """
     Unified database for ExecutionContext and DatasetProfile.
-    
+
     Thread-safe singleton with one connection per thread.
     Replaces separate dataset_profile_db and session_db.
     """
-    
+
     _instance = None
     _lock = threading.Lock()
-    
+
     def __new__(cls, db_path: str = str(SESSION_DB_PATH)):
         if cls._instance is None:
             with cls._lock:
@@ -45,11 +45,11 @@ class ContextDatabase:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self, db_path: str = str(SESSION_DB_PATH)):
         if self._initialized:
             return
-        
+
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()
@@ -57,7 +57,7 @@ class ContextDatabase:
         self._create_tables()
         self._initialized = True
         logger.info("ContextDatabase initialized at %s", self.db_path)
-    
+
     @contextmanager
     def _get_connection(self):
         """Thread-safe connection manager."""
@@ -90,7 +90,7 @@ class ContextDatabase:
                             time.sleep(0.05 * (attempt + 1))
                             continue
                         raise
-    
+
     def _create_tables(self):
         """Create unified schema for sessions and dataset profiles."""
         with self._get_connection() as conn:
@@ -108,7 +108,7 @@ class ContextDatabase:
             """)
 
             self._ensure_sessions_revision_column(conn)
-            
+
             # Dataset profiles table (stores DatasetProfile)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS dataset_profiles (
@@ -118,39 +118,39 @@ class ContextDatabase:
                     file_path TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
+
                     -- Schema detection
                     schema_detected BOOLEAN DEFAULT 0,
                     schema_result TEXT,
                     schema_confidence REAL,
                     schema_evidence TEXT,
-                    
+
                     -- Target detection
                     target_detected BOOLEAN DEFAULT 0,
                     target_candidates TEXT,
                     chosen_target TEXT,
                     target_locked BOOLEAN DEFAULT 0,
                     target_override_reason TEXT,
-                    
+
                     -- Modality
                     modality_breakdown TEXT,
-                    
+
                     -- Compatibility
                     global_compatible BOOLEAN DEFAULT 0,
                     compatibility_score REAL,
                     compatibility_notes TEXT,
-                    
+
                     -- Preprocessing
                     preprocessing_plan TEXT,
-                    
+
                     -- Embeddings
                     embeddings_cached BOOLEAN DEFAULT 0,
                     embedding_refs TEXT,
-                    
+
                     -- User overrides
                     user_overrides TEXT,
                     revision INTEGER NOT NULL DEFAULT 0,
-                    
+
                     FOREIGN KEY (session_id) REFERENCES sessions(session_id)
                 )
             """)
@@ -170,21 +170,21 @@ class ContextDatabase:
                     FOREIGN KEY (session_id) REFERENCES sessions(session_id)
                 )
             """)
-            
+
             # Indices for fast lookups
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_sessions_updated 
+                CREATE INDEX IF NOT EXISTS idx_sessions_updated
                 ON sessions(updated_at DESC)
             """)
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_profiles_session 
+                CREATE INDEX IF NOT EXISTS idx_profiles_session
                 ON dataset_profiles(session_id)
             """)
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_probe_samples_updated
                 ON probe_samples(updated_at DESC)
             """)
-            
+
             logger.info("Database schema created")
 
     @staticmethod
@@ -241,9 +241,9 @@ class ContextDatabase:
             )
 
         logger.info("ContextDatabase: added sessions.revision column for optimistic locking")
-    
+
     # ===== ExecutionContext Operations =====
-    
+
     def save_context(
         self,
         context_dict: Dict[str, Any],
@@ -257,7 +257,7 @@ class ContextDatabase:
         now_iso = datetime.now(timezone.utc).isoformat()
         context_dict.setdefault('created_at', now_iso)
         context_dict.setdefault('updated_at', now_iso)
-        
+
         with self._get_connection() as conn:
             cursor = conn.execute(
                 "SELECT revision FROM sessions WHERE session_id = ?",
@@ -345,7 +345,7 @@ class ContextDatabase:
                 logger.debug("Created context for session %s", session_id)
 
         return int(context_dict.get("revision", 0) or 0)
-    
+
     def session_exists(self, session_id: str) -> bool:
         """Return True if a session row exists (regardless of ExecutionContext state)."""
         with self._get_connection() as conn:
@@ -370,7 +370,7 @@ class ContextDatabase:
                     payload["revision"] = int(row["revision"] or 0)
                 return payload
             return None
-    
+
     def list_sessions(
         self,
         limit: int = 100,
@@ -434,7 +434,7 @@ class ContextDatabase:
                     limit=safe_limit,
                     offset=safe_offset,
                 )
-    
+
     def get_session_count(
         self,
         user_id: Optional[str] = None,
@@ -442,11 +442,11 @@ class ContextDatabase:
     ) -> int:
         """
         Get total number of sessions (for pagination).
-        
+
         Args:
             user_id: Optional user filter (matched from context_json.user_id)
             status: Optional status filter (matched against pipeline_stage)
-        
+
         Returns:
             Total count of sessions
         """
@@ -457,7 +457,7 @@ class ContextDatabase:
                 return row['count'] if row else 0
 
             status_expr = (
-                "COALESCE(" 
+                "COALESCE("
                 "NULLIF(json_extract(context_json, '$.status'), ''), "
                 "CASE WHEN pipeline_stage = 'closed' THEN 'closed' ELSE 'active' END"
                 ")"
@@ -565,7 +565,7 @@ class ContextDatabase:
         if safe_limit == 0:
             return []
         return filtered_rows[safe_offset:safe_offset + safe_limit]
-    
+
     def close_session(self, session_id: str) -> bool:
         """Mark a session as closed."""
         context_dict = self.load_context(session_id)
@@ -588,7 +588,7 @@ class ContextDatabase:
         Called on API startup and periodically to prevent unbounded DB growth.
         Returns the number of sessions deleted.
         """
-        cutoff = (
+        (
             datetime.now(timezone.utc)
             .replace(tzinfo=None)  # SQLite stores naive UTC strings
         )
@@ -683,9 +683,9 @@ class ContextDatabase:
         buffer = io.BytesIO(gzip.decompress(raw))
         loaded = np.load(buffer, allow_pickle=False)
         return loaded["X"], loaded["y"]
-    
+
     # ===== DatasetProfile Operations =====
-    
+
     def save_profile(
         self,
         profile_dict: Dict[str, Any],
@@ -811,7 +811,7 @@ class ContextDatabase:
                     new_revision,
                 ))
                 logger.debug("Created profile for dataset %s", dataset_id)
-    
+
     def load_profile(self, dataset_id: str) -> Optional[Dict[str, Any]]:
         """Load DatasetProfile from dataset_profiles table."""
         with self._get_connection() as conn:
@@ -820,12 +820,12 @@ class ContextDatabase:
                 (dataset_id,)
             )
             row = cursor.fetchone()
-            
+
             if not row:
                 return None
-            
+
             return self._row_to_profile_dict(row)
-    
+
     def load_session_profiles(self, session_id: str) -> List[Dict[str, Any]]:
         """Load all DatasetProfiles for a session."""
         with self._get_connection() as conn:
@@ -833,21 +833,21 @@ class ContextDatabase:
                 "SELECT * FROM dataset_profiles WHERE session_id = ? ORDER BY created_at",
                 (session_id,)
             )
-            
+
             return [self._row_to_profile_dict(row) for row in cursor.fetchall()]
-    
+
     def get_session_profiles(self, session_id: str) -> List[Dict[str, Any]]:
         """
         Alias for load_session_profiles (backward compatibility).
-        
+
         Get all dataset profiles for a session.
         """
         return self.load_session_profiles(session_id)
-    
+
     def _row_to_profile_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
         """Convert SQLite row to profile dict, parsing JSON fields."""
         data = dict(row)
-        
+
         # Parse JSON fields
         json_fields = [
             'schema_result', 'target_candidates', 'modality_breakdown',
@@ -859,14 +859,14 @@ class ContextDatabase:
                     data[field] = json.loads(data[field])
                 except (json.JSONDecodeError, TypeError):
                     data[field] = None
-        
+
         # Convert booleans
         bool_fields = ['schema_detected', 'target_detected', 'target_locked',
                        'global_compatible', 'embeddings_cached']
         for field in bool_fields:
             if field in data and data[field] is not None:
                 data[field] = bool(data[field])
-        
+
         return data
 
 

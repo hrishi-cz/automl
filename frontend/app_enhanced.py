@@ -12,10 +12,8 @@ except ImportError:
     pass
 import streamlit as st
 import requests
-import json
 import time
 import pandas as pd
-import numpy as np
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -750,8 +748,7 @@ def render_workflow_dashboard():
           </div>
         </div>"""
         if i < 7:
-            conn_cls = "done" if status in ("completed", "reused") else ""
-            steps_html += f'<div class="av-connector"></div>'
+            steps_html += '<div class="av-connector"></div>'
     steps_html += '</div>'
     st.markdown(steps_html, unsafe_allow_html=True)
 
@@ -857,12 +854,12 @@ def render_workflow_dashboard():
                 st.sidebar.caption("Fit analysis unavailable")
         except Exception:
             st.sidebar.caption("Fit analysis unavailable")
-    
+
     st.divider()
-    
+
     # Workflow Progress
     st.subheader("📋 Workflow Stages")
-    
+
     stages = [
         ("Phase 1", "Data Ingestion", "Upload & cache datasets"),
         ("Phase 2", "Schema Detection", "Detect columns & problem type"),
@@ -872,7 +869,7 @@ def render_workflow_dashboard():
         ("Phase 6", "Monitoring", "Track performance & drift"),
         ("Phase 7", "Prediction", "Make multimodal predictions")
     ]
-    
+
     cols = st.columns(7)
     for i, (col, (phase, name, desc)) in enumerate(zip(cols, stages)):
         with col:
@@ -883,9 +880,9 @@ def render_workflow_dashboard():
             else:
                 st.markdown(f"### ⭕ {phase}\n{name}")
             st.caption(desc)
-    
+
     st.divider()
-    
+
     # Phase Selection
     phase = st.radio(
         "Select Workflow Phase:",
@@ -895,9 +892,9 @@ def render_workflow_dashboard():
         horizontal=True,
         help="Work through phases 1→7 in order. Each phase builds on the previous: ingest data → detect schema → preprocess → select model → train → monitor for drift → predict.",
     )
-    
+
     st.session_state.workflow_stage = int(phase.split()[1].rstrip(':'))
-    
+
     # Render selected phase
     if st.session_state.workflow_stage == 1:
         render_phase_1_data_ingestion()
@@ -2158,16 +2155,16 @@ def render_phase_2_schema_detection():
     - Identifies target column automatically
     - Infers global problem type
     """)
-    
+
     if not st.session_state.dataset_uploaded:
         st.warning("⚠️ Please load datasets in Phase 1 first")
         if st.button("← Go to Phase 1"):
             st.session_state.workflow_stage = 1
             st.rerun()
         return
-    
+
     col1, col2 = st.columns([2, 1])
-    
+
     # =========================================================
     # 🔍 DETECT BUTTON — FIXED
     # =========================================================
@@ -2176,7 +2173,7 @@ def render_phase_2_schema_detection():
             with st.spinner("Analyzing ingested datasets..."):
                 progress_bar = st.progress(0)
                 status = st.empty()
-                
+
                 try:
                     status.write("📍 Detecting schema for ingested datasets...")
 
@@ -2186,9 +2183,9 @@ def render_phase_2_schema_detection():
                         json={"session_id": st.session_state.session_id},
                         timeout=120
                     )
-                    
+
                     progress_bar.progress(0.6)
-                    
+
                     if response.status_code == 200:
                         payload = response.json()
 
@@ -2231,11 +2228,11 @@ def render_phase_2_schema_detection():
                     _show_error_with_retry("❌ Timeout after 120 seconds — try fewer datasets or shorter text columns.", "retry_schema_timeout")
                 except Exception as e:
                     _show_error_with_retry(f"❌ Detection error: {str(e)}", "retry_schema_err")
-    
+
     with col2:
         if st.checkbox("Show Detection Details"):
             st.info("📊 Verbose mode enabled")
-    
+
     # =========================================================
     # 📊 DISPLAY RESULTS — FULLY FIXED FOR MULTI-DATASET
     # =========================================================
@@ -3036,7 +3033,7 @@ def render_phase_3_preprocessing():
                     st.markdown("**After** *(augmented, pre-normalize)*")
                     st.image(
                         _b64_fe.b64decode(_preview_aug_b64),
-                        caption=f"Flip + ColorJitter + Rotation"
+                        caption="Flip + ColorJitter + Rotation"
                         + (" + Perspective" if _aug == "strong" else "")
                         + (" + Sharpening" if _sharp else ""),
                         use_container_width=True,
@@ -3313,8 +3310,8 @@ def render_phase_4_model_selection():
                 )
             else:
                 _why_reasons.append(
-                    f"**Fusion strategy**: Single modality detected. Fusion is "
-                    f"passthrough (no cross-modal alignment needed)."
+                    "**Fusion strategy**: Single modality detected. Fusion is "
+                    "passthrough (no cross-modal alignment needed)."
                 )
 
             # Data complexity reasoning
@@ -4286,11 +4283,11 @@ def render_phase_5_training():
             with col3:
                 st.markdown("**After (contrastive + head)**")
                 if _clip_active and _cw > 0:
-                    st.write(f"CLIP projections: ✅ active")
+                    st.write("CLIP projections: ✅ active")
                     st.write(f"Contrastive weight: `{_cw:.3f}`")
                 else:
                     st.write("CLIP projections: single-modality (inactive)")
-                st.write(f"Classification head: `MLP`")
+                st.write("Classification head: `MLP`")
 
             if _grad_scales:
                 st.markdown("**Per-modality gradient health** (Wang et al. 2020 gradient balancing)")
@@ -6235,7 +6232,8 @@ def render_phase_7_prediction() -> None:
                         st.image(img_file, width=300)
                         # Save uploaded bytes to a temp file so the inference
                         # engine can open it via PIL.Image.open(path)
-                        import tempfile, os
+                        import tempfile
+                        import os
                         _tmp_dir = tempfile.mkdtemp(prefix="apex_img_")
                         _tmp_path = os.path.join(_tmp_dir, img_file.name)
                         with open(_tmp_path, "wb") as _fh:
@@ -6295,7 +6293,7 @@ def render_phase_7_prediction() -> None:
                     col_idx = i % 2
                     with feat_cols[col_idx]:
                         fname = st.text_input(f"Feature {i+1} name", value=f"feature_{i}", key=f"pred_fname_{i}")
-                        fval = st.number_input(f"Value", value=0.0, key=f"pred_fval_{i}", label_visibility="collapsed")
+                        fval = st.number_input("Value", value=0.0, key=f"pred_fval_{i}", label_visibility="collapsed")
                         sample_input[fname] = fval
 
         raw_inputs = [sample_input]

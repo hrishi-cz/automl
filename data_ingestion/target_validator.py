@@ -12,7 +12,7 @@ METHODOLOGY:
     3. Degeneracy: Avoid constant features
     4. Noise Robustness: Stability under small perturbations
     5. Feature Importance: Top k% of features matter
-  
+
   Final Score = 0.40×pred + 0.20×comp + 0.15×degen + 0.15×noise + 0.10×imp
 
 EXPECTED IMPROVEMENT:
@@ -34,7 +34,7 @@ RESEARCH CITATIONS:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
@@ -47,10 +47,10 @@ logger = logging.getLogger(__name__)
 class UniversalTargetValidator:
     """
     Learn-based predictability validator for all modalities.
-    
+
     Uses Random Forest 3-fold cross-validation on embeddings to score
     how well each modality can predict the target (in isolation).
-    
+
     Attributes
     ----------
     cv_folds : int
@@ -60,7 +60,7 @@ class UniversalTargetValidator:
     criterion : str
         "squared_error" (regression) or "gini" (classification)
     """
-    
+
     def __init__(
         self,
         cv_folds: int = 3,
@@ -69,7 +69,7 @@ class UniversalTargetValidator:
     ):
         """
         Initialize validator.
-        
+
         Parameters
         ----------
         cv_folds : int
@@ -87,7 +87,7 @@ class UniversalTargetValidator:
             "cv=%d, max_features=%d, criterion=%s",
             cv_folds, max_features, criterion,
         )
-    
+
     def _predict(
         self,
         X: np.ndarray,
@@ -96,7 +96,7 @@ class UniversalTargetValidator:
     ) -> float:
         """
         Compute Random Forest 3-fold CV accuracy.
-        
+
         Parameters
         ----------
         X : np.ndarray, shape (N, D)
@@ -105,12 +105,12 @@ class UniversalTargetValidator:
             Target values.
         task_type : str
             "regression" or "classification"
-        
+
         Returns
         -------
         float
             Mean CV accuracy (0-1).
-        
+
         Raises
         ------
         ValueError
@@ -122,7 +122,7 @@ class UniversalTargetValidator:
                 X.shape[0], self.cv_folds,
             )
             return 0.0
-        
+
         try:
             if task_type == "regression":
                 model = RandomForestRegressor(
@@ -147,13 +147,13 @@ class UniversalTargetValidator:
                     model, X, y, cv=self.cv_folds, scoring="accuracy"
                 )
                 score = np.mean(scores)
-            
+
             return float(score)
-        
+
         except Exception as e:
             logger.error("_predict failed: %s", e)
             return 0.0
-    
+
     def _check_complementarity(
         self,
         X: np.ndarray,
@@ -161,17 +161,17 @@ class UniversalTargetValidator:
     ) -> float:
         """
         Measure complementarity: how unique is this modality vs others?
-        
+
         If X_other provided, use negative cosine similarity.
         If not, use eigenvalue analysis (PCA variance).
-        
+
         Parameters
         ----------
         X : np.ndarray, shape (N, D)
             This modality's embeddings.
         X_other : Optional[np.ndarray]
             Other modalities' embeddings (stacked).
-        
+
         Returns
         -------
         float
@@ -182,13 +182,13 @@ class UniversalTargetValidator:
                 # Use variance of principal components (PCA-style)
                 scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X)
-                
+
                 # SVD
                 _, s, _ = np.linalg.svd(X_scaled, full_matrices=False)
                 # Variance explained by first k components
                 total_var = np.sum(s ** 2)
                 concentrated = total_var / (X.shape[0] - 1)
-                
+
                 # High variance = uninformative constant features = low complementarity
                 # Low variance = informative features = high complementarity
                 # Invert: 1 - normalized_concentration
@@ -198,30 +198,30 @@ class UniversalTargetValidator:
                 # Normalize
                 X_norm = X / (np.linalg.norm(X, axis=1, keepdims=True) + 1e-8)
                 other_norm = X_other / (np.linalg.norm(X_other, axis=1, keepdims=True) + 1e-8)
-                
+
                 # Pairwise similarity (max pooling across "other" modalities)
                 sims = np.abs((X_norm @ other_norm.T).max(axis=1))  # (N,)
                 mean_sim = float(np.mean(sims))
-                
+
                 # High similarity = redundant = low complementarity
                 # Low similarity = unique = high complementarity
                 score = 1.0 - mean_sim
-            
+
             return float(np.clip(score, 0.0, 1.0))
-        
+
         except Exception as e:
             logger.debug("_check_complementarity failed: %s", e)
             return 0.5  # Neutral default
-    
+
     def _check_degeneracy(self, X: np.ndarray) -> float:
         """
         Detect degenerate features (all zeros, all constant).
-        
+
         Parameters
         ----------
         X : np.ndarray, shape (N, D)
             Embeddings.
-        
+
         Returns
         -------
         float
@@ -229,18 +229,18 @@ class UniversalTargetValidator:
         """
         try:
             # Count non-zero, non-constant features
-            non_zero_cols = np.sum((X != 0).any(axis=0))  # ≠ 0 in at least one row
+            np.sum((X != 0).any(axis=0))  # ≠ 0 in at least one row
             non_constant_cols = np.sum(X.std(axis=0) > 1e-8)  # Non-zero variance
-            
+
             # Fraction of good features
             good_fraction = non_constant_cols / max(1, X.shape[1])
-            
+
             return float(np.clip(good_fraction, 0.0, 1.0))
-        
+
         except Exception as e:
             logger.debug("_check_degeneracy failed: %s", e)
             return 1.0  # Assume OK by default
-    
+
     def _check_noise_robustness(
         self,
         X: np.ndarray,
@@ -250,7 +250,7 @@ class UniversalTargetValidator:
     ) -> float:
         """
         Measure robustness: do predictions stay stable with noisy inputs?
-        
+
         Parameters
         ----------
         X : np.ndarray, shape (N, D)
@@ -261,7 +261,7 @@ class UniversalTargetValidator:
             "regression" or "classification"
         noise_level : float
             Gaussian noise std (relative to data range).
-        
+
         Returns
         -------
         float
@@ -270,28 +270,28 @@ class UniversalTargetValidator:
         try:
             # Clean baseline
             score_clean = self._predict(X, y, task_type=task_type)
-            
+
             # Add noise
             X_range = np.ptp(X, axis=0)  # Peak-to-peak
             noise = np.random.randn(*X.shape) * X_range * noise_level
             X_noisy = X + noise
-            
+
             # Score with noise
             score_noisy = self._predict(X_noisy, y, task_type=task_type)
-            
+
             # Stability = 1 - (score drop / baseline)
             if score_clean > 0:
                 drop = abs(score_clean - score_noisy) / score_clean
                 robustness = 1.0 - drop
             else:
                 robustness = 0.5
-            
+
             return float(np.clip(robustness, 0.0, 1.0))
-        
+
         except Exception as e:
             logger.debug("_check_noise_robustness failed: %s", e)
             return 0.5  # Neutral
-    
+
     def _check_feature_importance(
         self,
         X: np.ndarray,
@@ -301,10 +301,10 @@ class UniversalTargetValidator:
     ) -> float:
         """
         Is there feature importance concentration? (Pareto principle)
-        
+
         If top 50% of features dominate, score is high (= concentrated signal).
         If features uniformly important, score is lower (= diffuse signal).
-        
+
         Parameters
         ----------
         X : np.ndarray, shape (N, D)
@@ -315,7 +315,7 @@ class UniversalTargetValidator:
             "regression" or "classification"
         top_k_percent : float
             Check if top k% of features explain top_k_percent of importance.
-        
+
         Returns
         -------
         float
@@ -334,25 +334,25 @@ class UniversalTargetValidator:
                     max_features=min(self.max_features, X.shape[1]),
                     random_state=42,
                 )
-            
+
             model.fit(X, y)
             importances = model.feature_importances_  # (D,)
-            
+
             # Sort and cumsum
             sorted_imp = np.sort(importances)[::-1]
             cumsum_imp = np.cumsum(sorted_imp)
             cumsum_imp = cumsum_imp / cumsum_imp[-1]  # Normalize to [0, 1]
-            
+
             # At what fraction of features does top_k_percent importance reach?
             threshold_idx = np.searchsorted(cumsum_imp, top_k_percent)
             concentration = 1.0 - (threshold_idx / len(importances))
-            
+
             return float(np.clip(concentration, 0.0, 1.0))
-        
+
         except Exception as e:
             logger.debug("_check_feature_importance failed: %s", e)
             return 0.5  # Neutral
-    
+
     def final_score(
         self,
         embeddings: Dict[str, np.ndarray],
@@ -362,12 +362,12 @@ class UniversalTargetValidator:
     ) -> float:
         """
         Compute final predictability score for a single modality.
-        
+
         Formula:
         --------
         final = 0.40×predictability + 0.20×complementarity + 0.15×degeneracy
                 + 0.15×noise_robustness + 0.10×feature_importance
-        
+
         Parameters
         ----------
         embeddings : Dict[str, np.ndarray]
@@ -378,7 +378,7 @@ class UniversalTargetValidator:
             "regression" or "classification"
         weights : Optional[Dict[str, float]]
             Override default weights: {"predictability": 0.40, ...}
-        
+
         Returns
         -------
         float
@@ -392,9 +392,9 @@ class UniversalTargetValidator:
             "noise_robustness": 0.15,
             "feature_importance": 0.10,
         }
-        
+
         scores = {}
-        
+
         # For each modality
         for mod_name, X in embeddings.items():
             if X.shape[0] < self.cv_folds:
@@ -404,26 +404,26 @@ class UniversalTargetValidator:
                 )
                 scores[mod_name] = 0.0
                 continue
-            
+
             # 1. Predictability (RF 3-fold CV)
             pred = self._predict(X, y, task_type=task_type)
-            
+
             # 2. Complementarity (vs other modalities)
             X_other = np.concatenate(
                 [v for k, v in embeddings.items() if k != mod_name],
                 axis=1,
             ) if len(embeddings) > 1 else None
             comp = self._check_complementarity(X, X_other)
-            
+
             # 3. Degeneracy (fraction non-constant features)
             degen = self._check_degeneracy(X)
-            
+
             # 4. Noise robustness (stability under perturbation)
             noise = self._check_noise_robustness(X, y, task_type=task_type)
-            
+
             # 5. Feature importance (concentration of signal)
             feat = self._check_feature_importance(X, y, task_type=task_type)
-            
+
             # Weighted sum
             final = (
                 w["predictability"] * pred +
@@ -432,15 +432,15 @@ class UniversalTargetValidator:
                 w["noise_robustness"] * noise +
                 w["feature_importance"] * feat
             )
-            
+
             scores[mod_name] = float(np.clip(final, 0.0, 1.0))
-            
+
             logger.info(
                 "Modality '%s' scores: pred=%.3f comp=%.3f degen=%.3f "
                 "noise=%.3f feat=%.3f → final=%.3f",
                 mod_name, pred, comp, degen, noise, feat, scores[mod_name],
             )
-        
+
         # Return scores as dict
         return scores
 
@@ -452,7 +452,7 @@ def validate_all_modalities(
 ) -> Dict[str, float]:
     """
     Convenience function: validate all modalities at once.
-    
+
     Parameters
     ----------
     embeddings : Dict[str, np.ndarray]
@@ -461,7 +461,7 @@ def validate_all_modalities(
         Target variable.
     task_type : str
         "regression" or "classification"
-    
+
     Returns
     -------
     Dict[str, float]

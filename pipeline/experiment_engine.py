@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 

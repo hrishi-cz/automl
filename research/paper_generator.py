@@ -32,7 +32,7 @@ def _load_results_file(path: Path) -> Any:
 class PaperGenerator:
     """
     Generates research paper markdown from experiment results.
-    
+
     Usage:
         collector = ExperimentCollector()
         experiments = collector.collect()
@@ -131,13 +131,13 @@ class PaperGenerator:
         modalities = ", ".join(self.best_exp.get("modalities", ["tabular"]))
         fusion = self.best_exp.get("fusion_type", "concatenation")
 
-        return f"""We propose a semantic-aware multimodal AutoML system that integrates 
-schema-driven preprocessing, adaptive fusion strategies, and uncertainty-weighted 
-modality weighting. Our system achieves {acc:.3f} accuracy and {f1:.3f} F1-score 
-on {modalities} data with {fusion} fusion, while maintaining low latency ({latency:.1f}ms per 
-inference). Extensive experiments across {len(self.experiments)} trained models demonstrate 
+        return f"""We propose a semantic-aware multimodal AutoML system that integrates
+schema-driven preprocessing, adaptive fusion strategies, and uncertainty-weighted
+modality weighting. Our system achieves {acc:.3f} accuracy and {f1:.3f} F1-score
+on {modalities} data with {fusion} fusion, while maintaining low latency ({latency:.1f}ms per
+inference). Extensive experiments across {len(self.experiments)} trained models demonstrate
 robustness to missing modalities and improved calibration metrics (ECE, Brier).
-We further contribute XAI artifacts (SHAP, GradCAM, attention weights) integrated 
+We further contribute XAI artifacts (SHAP, GradCAM, attention weights) integrated
 post-training for full interpretability."""
 
     # -----------------------------------------------------------------------
@@ -158,7 +158,7 @@ This work addresses four key challenges in multimodal AutoML:
 1. **Schema-Aware Preprocessing**: Learning target-adaptive preprocessing pipelines
    rather than applying generic preprocessing to all datasets.
 
-2. **Intelligent Fusion**: Selecting optimal fusion strategies based on modality 
+2. **Intelligent Fusion**: Selecting optimal fusion strategies based on modality
    characteristics and predicted complementarity, not via grid search.
 
 3. **Handling Missing Data**: Graceful degradation when modalities are absent,
@@ -284,7 +284,7 @@ full fine-tuning quality on domain-shifted data.
                 f"`d_latent`-dim |"
             )
             _mode_str = "full token sequences (ViT patches + BERT states)" if _token_mode else "pooled CLS vectors"
-            _enc_section.append(f"| After | CLS read-out → MLP head | logits |")
+            _enc_section.append("| After | CLS read-out → MLP head | logits |")
             _enc_section.append(f"\nInput mode: **{_mode_str}**.")
             if _clip_active:
                 _enc_section.append(
@@ -547,10 +547,10 @@ All artifacts are saved to model registry metadata for downstream explanation AP
             self.generate_efficiency_section(),
             """## Conclusion
 
-We have presented a unified semantic-aware multimodal AutoML system that seamlessly 
-integrates schema detection, target-adaptive preprocessing, intelligent fusion, and 
-post-training explainability. Our approach demonstrates consistent improvements in 
-accuracy, robustness to missing modalities, and interpretability compared to baseline 
+We have presented a unified semantic-aware multimodal AutoML system that seamlessly
+integrates schema detection, target-adaptive preprocessing, intelligent fusion, and
+post-training explainability. Our approach demonstrates consistent improvements in
+accuracy, robustness to missing modalities, and interpretability compared to baseline
 concatenation methods.
 
 Key contributions:

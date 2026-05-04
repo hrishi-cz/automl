@@ -11,7 +11,7 @@ PURPOSE (FIX-4 Part 1):
 
 ARCHITECTURE:
   TextEncoder    (BERT)      → 768-dim embeddings
-  ImageEncoder   (ResNet50)  → 2048-dim embeddings  
+  ImageEncoder   (ResNet50)  → 2048-dim embeddings
   TabularEncoder (numeric)   → numeric features
 
 INTEGRATION:
@@ -52,14 +52,14 @@ RESNET_DIM = 2048
 class ModalityEncoder:
     """
     Convert heterogeneous modalities to numeric embeddings.
-    
+
     Provides unified interface for:
     - Text: BERT pre-trained embeddings
     - Image: ResNet50 pre-trained features
     - Tabular: Numeric features (passed through)
-    
+
     All outputs are (N, D) numpy arrays suitable for RF validation.
-    
+
     Attributes
     ----------
     text_encoder : Optional[nn.Module]
@@ -69,7 +69,7 @@ class ModalityEncoder:
     device : torch.device
         CPU or CUDA for encoding
     """
-    
+
     def __init__(
         self,
         text_encoder: Optional[nn.Module] = None,
@@ -79,7 +79,7 @@ class ModalityEncoder:
     ):
         """
         Initialize encoder with optional pre-trained models.
-        
+
         Parameters
         ----------
         text_encoder : Optional[nn.Module]
@@ -101,15 +101,15 @@ class ModalityEncoder:
         self.text_encoder = text_encoder
         self.image_encoder = image_encoder
         self.device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
-        
+
         if self.text_encoder is not None:
             self.text_encoder = self.text_encoder.to(self.device)
             self.text_encoder.eval()
-        
+
         if self.image_encoder is not None:
             self.image_encoder = self.image_encoder.to(self.device)
             self.image_encoder.eval()
-        
+
         logger.info(
             "ModalityEncoder initialized on %s. "
             "Text encoder: %s, Image encoder: %s",
@@ -172,7 +172,7 @@ class ModalityEncoder:
                 return "tabular"
 
         return "tabular"
-    
+
     def encode_text(
         self,
         texts: Union[List[str], np.ndarray],
@@ -180,19 +180,19 @@ class ModalityEncoder:
     ) -> np.ndarray:
         """
         Encode text to BERT embeddings.
-        
+
         Parameters
         ----------
         texts : Union[List[str], np.ndarray]
             List of text strings to encode.
         batch_size : int
             Batch size for encoding.
-        
+
         Returns
         -------
         np.ndarray, shape (N, 768)
             BERT embeddings for each text.
-        
+
         Raises
         ------
         RuntimeError
@@ -205,19 +205,19 @@ class ModalityEncoder:
                 "Text encoder not initialized. "
                 "Pass text_encoder to ModalityEncoder.__init__()."
             )
-        
+
         if isinstance(texts, np.ndarray):
             texts = texts.tolist()
-        
+
         if not texts or len(texts) == 0:
             raise ValueError("texts cannot be empty")
-        
+
         embeddings_list: List[np.ndarray] = []
-        
+
         with torch.no_grad():
             for i in range(0, len(texts), batch_size):
                 batch_texts = texts[i : i + batch_size]
-                
+
                 # Tokenize (assuming text_encoder has tokenizer)
                 if hasattr(self.text_encoder, "tokenizer"):
                     encoded = self.text_encoder.tokenizer(
@@ -231,7 +231,7 @@ class ModalityEncoder:
                     attention_mask = encoded.get("attention_mask", None)
                     if attention_mask is not None:
                         attention_mask = attention_mask.to(self.device)
-                    
+
                     # Forward pass
                     outputs = self.text_encoder.transformer(
                         input_ids=input_ids,
@@ -244,15 +244,15 @@ class ModalityEncoder:
                         "text_encoder must have a 'tokenizer' attribute. "
                         "Expected transformers.PreTrainedModel."
                     )
-                
+
                 embeddings_list.append(batch_embeddings)
-        
+
         embeddings = np.vstack(embeddings_list)
         logger.debug(
             "Encoded %d texts to %s embeddings", len(texts), embeddings.shape
         )
         return embeddings  # (N, 768)
-    
+
     def encode_image(
         self,
         images: Union[List, np.ndarray],
@@ -260,19 +260,19 @@ class ModalityEncoder:
     ) -> np.ndarray:
         """
         Encode image to ResNet50 features.
-        
+
         Parameters
         ----------
         images : Union[List, np.ndarray]
             List of PIL Images, file paths, or numpy arrays (H, W, C).
         batch_size : int
             Batch size for encoding.
-        
+
         Returns
         -------
         np.ndarray, shape (N, 2048)
             ResNet50 feature embeddings for each image.
-        
+
         Raises
         ------
         RuntimeError
@@ -285,15 +285,15 @@ class ModalityEncoder:
                 "Image encoder not initialized. "
                 "Pass image_encoder to ModalityEncoder.__init__()."
             )
-        
+
         if not images or len(images) == 0:
             raise ValueError("images cannot be empty")
-        
+
         embeddings_list: List[np.ndarray] = []
-        
+
         # Prepare image preprocessing (assuming encoder has some preprocessing)
         from torchvision import transforms
-        
+
         preprocess = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
@@ -302,11 +302,11 @@ class ModalityEncoder:
                 std=[0.229, 0.224, 0.225],
             ),
         ])
-        
+
         with torch.no_grad():
             for i in range(0, len(images), batch_size):
                 batch_images = images[i : i + batch_size]
-                
+
                 # Convert to tensors
                 tensors = []
                 for img in batch_images:
@@ -315,24 +315,24 @@ class ModalityEncoder:
                         if Image is None:
                             raise ImportError("PIL is required for image loading")
                         img = Image.open(img).convert("RGB")
-                    
+
                     if not isinstance(img, torch.Tensor):
                         img = preprocess(img)
-                    
+
                     tensors.append(img)
-                
+
                 batch_tensor = torch.stack(tensors).to(self.device)  # (B, 3, 224, 224)
-                
+
                 # Forward pass (extract before final FC layer)
                 batch_embeddings = self.image_encoder(batch_tensor).cpu().numpy()  # (B, 2048)
                 embeddings_list.append(batch_embeddings)
-        
+
         embeddings = np.vstack(embeddings_list)
         logger.debug(
             "Encoded %d images to %s embeddings", len(images), embeddings.shape
         )
         return embeddings  # (N, 2048)
-    
+
     def encode_tabular(
         self,
         data: Union[pd.DataFrame, np.ndarray],
@@ -340,7 +340,7 @@ class ModalityEncoder:
     ) -> np.ndarray:
         """
         Extract numeric features from tabular data.
-        
+
         Parameters
         ----------
         data : Union[pd.DataFrame, np.ndarray]
@@ -348,12 +348,12 @@ class ModalityEncoder:
         numeric_cols : Optional[List[str]]
             For DataFrames: specific columns to extract.
             If None, uses all numeric columns.
-        
+
         Returns
         -------
         np.ndarray, shape (N, D)
             Numeric features. D depends on number of columns.
-        
+
         Raises
         ------
         ValueError
@@ -362,34 +362,34 @@ class ModalityEncoder:
         if isinstance(data, pd.DataFrame):
             if numeric_cols is None:
                 numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-            
+
             if not numeric_cols:
                 raise ValueError(
                     "No numeric columns found in DataFrame. "
                     "Specify numeric_cols parameter."
                 )
-            
+
             embeddings = data[numeric_cols].fillna(0.0).values  # (N, D)
-        
+
         elif isinstance(data, np.ndarray):
             if data.size == 0:
                 raise ValueError("numpy array cannot be empty")
             embeddings = np.asarray(data, dtype=np.float32)
-        
+
         else:
             raise TypeError(
                 f"data must be DataFrame or ndarray, got {type(data)}"
             )
-        
+
         if embeddings.shape[0] == 0:
             raise ValueError("embeddings must have at least 1 row")
-        
+
         logger.debug(
             "Extracted %s numeric embeddings from tabular data",
             embeddings.shape,
         )
         return embeddings  # (N, D)
-    
+
     def encode(
         self,
         modality_or_data: Union[str, List, np.ndarray, pd.DataFrame],
@@ -401,7 +401,7 @@ class ModalityEncoder:
     ) -> Union[np.ndarray, Tuple[np.ndarray, str, Tuple[int, ...]]]:
         """
         Unified encoding interface.
-        
+
         Parameters
         ----------
         modality_or_data : Union[str, List, np.ndarray, pd.DataFrame]
@@ -416,7 +416,7 @@ class ModalityEncoder:
             Optional field-name hint used for auto-detection.
         **kwargs : dict
             Additional arguments passed to specific encoder.
-        
+
         Returns
         -------
         np.ndarray | Tuple[np.ndarray, str, Tuple[int, ...]]
@@ -494,16 +494,16 @@ class ModalityEncoder:
                 getattr(self.image_encoder, "model_name", type(self.image_encoder).__name__)
             )
         return "tabular_numeric"
-    
+
     def get_embedding_dim(self, modality: str) -> int:
         """
         Return embedding dimension for a modality.
-        
+
         Parameters
         ----------
         modality : str
             "text", "image", or "tabular"
-        
+
         Returns
         -------
         int
@@ -526,7 +526,7 @@ def create_modality_encoder(
 ) -> ModalityEncoder:
     """
     Factory function to create ModalityEncoder with pre-trained models.
-    
+
     Parameters
     ----------
     use_text : bool
@@ -535,7 +535,7 @@ def create_modality_encoder(
         Load ResNet50 encoder if True.
     device : Optional[torch.device]
         Device for computation.
-    
+
     Returns
     -------
     ModalityEncoder
@@ -543,7 +543,7 @@ def create_modality_encoder(
     text_encoder = None
     image_encoder = None
     device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
-    
+
     if use_text:
         try:
             from transformers import AutoTokenizer, AutoModel
@@ -555,7 +555,7 @@ def create_modality_encoder(
             logger.info("Loaded BERT text encoder")
         except Exception as e:
             logger.warning("Failed to load BERT: %s", e)
-    
+
     if use_image:
         try:
             import torchvision.models as models
@@ -566,7 +566,7 @@ def create_modality_encoder(
             logger.info("Loaded ResNet50 image encoder")
         except Exception as e:
             logger.warning("Failed to load ResNet50: %s", e)
-    
+
     return ModalityEncoder(
         text_encoder=text_encoder,
         image_encoder=image_encoder,

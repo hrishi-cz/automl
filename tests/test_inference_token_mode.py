@@ -1,9 +1,7 @@
 """Tests for inference engine ULA token-mode detection and attention rollout."""
 
-import pytest
 import torch
 import torch.nn as nn
-import numpy as np
 
 
 class TestULATokenModeDetection:

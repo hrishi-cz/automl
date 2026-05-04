@@ -219,7 +219,7 @@ def run_full_benchmark(
     logger.info("Fixtures ready: %s", list(fixture_paths.keys()))
 
     # Choose which datasets to benchmark on
-    active_datasets = datasets or list(fixture_paths.keys())
+    datasets or list(fixture_paths.keys())
     _primary_tabular = fixture_paths.get("adult", fixture_paths.get("housing", ""))
     _primary_multimodal = fixture_paths.get("hateful_memes", "")
 

@@ -22,7 +22,7 @@ Architecture
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,11 @@ class PreprocessingValidationError(Exception):
 class PreprocessingValidator:
     """
     Validates preprocessing plan before Phase 3 execution.
-    
+
     Purpose: Fail-fast on schema mismatches to prevent silent errors
     downstream in training (Phase 5+).
     """
-    
+
     def validate_plan(
         self,
         plan: Dict[str, Any],
@@ -48,7 +48,7 @@ class PreprocessingValidator:
     ) -> Dict[str, Any]:
         """
         Comprehensive validation of preprocessing plan against schema.
-        
+
         Parameters
         ----------
         plan : Dict
@@ -57,11 +57,11 @@ class PreprocessingValidator:
             Phase 2 GlobalSchema (serialised)
         dataset_shape : Optional tuple
             (n_rows, n_cols) of actual dataset
-            
+
         Returns
         -------
         Dict with validation results and any warnings/errors
-        
+
         Raises
         ------
         PreprocessingValidationError
@@ -74,7 +74,7 @@ class PreprocessingValidator:
             "checks_passed": 0,
             "checks_total": 0,
         }
-        
+
         try:
             # Check 1: Modality coherence
             results["checks_total"] += 1
@@ -83,7 +83,7 @@ class PreprocessingValidator:
         except Exception as e:
             results["errors"].append(f"Modality coherence check failed: {str(e)}")
             results["valid"] = False
-        
+
         try:
             # Check 2: Target column validation
             results["checks_total"] += 1
@@ -92,7 +92,7 @@ class PreprocessingValidator:
         except Exception as e:
             results["errors"].append(f"Target column validation failed: {str(e)}")
             results["valid"] = False
-        
+
         try:
             # Check 3: Feature selections match schema
             results["checks_total"] += 1
@@ -101,7 +101,7 @@ class PreprocessingValidator:
         except Exception as e:
             results["errors"].append(f"Feature selection validation failed: {str(e)}")
             results["valid"] = False
-        
+
         try:
             # Check 4: Text/image kwargs valid
             results["checks_total"] += 1
@@ -110,7 +110,7 @@ class PreprocessingValidator:
         except Exception as e:
             results["errors"].append(f"Encoding kwargs validation failed: {str(e)}")
             results["valid"] = False
-        
+
         # Log results
         if not results["valid"]:
             logger.error(
@@ -121,7 +121,7 @@ class PreprocessingValidator:
             raise PreprocessingValidationError(
                 f"Preprocessing plan validation failed: {results['errors']}"
             )
-        
+
         logger.info(
             "FIX-6: Preprocessing validation PASSED (%d/%d checks). "
             "Warnings: %s",
@@ -129,9 +129,9 @@ class PreprocessingValidator:
             results["checks_total"],
             results["warnings"] if results["warnings"] else "none"
         )
-        
+
         return results
-    
+
     def _validate_modality_coherence(
         self,
         plan: Dict[str, Any],
@@ -141,21 +141,21 @@ class PreprocessingValidator:
         """Ensure modalities in plan match schema modalities."""
         schema_mods = set(schema_info.get("global_modalities", []))
         plan_mods = set(plan.get("modality", {}).keys())
-        
+
         # Modalities in plan but not in schema
         extra_mods = plan_mods - schema_mods
         if extra_mods:
             results["warnings"].append(
                 f"Plan includes modalities not in schema: {extra_mods}"
             )
-        
+
         # Modalities in schema but not planned
         missing_mods = schema_mods - plan_mods
         if missing_mods:
             logger.debug("Schema modalities not planned: %s (OK if weight < 0.2)", missing_mods)
-        
+
         logger.debug("Modality coherence: schema=%s, plan=%s", schema_mods, plan_mods)
-    
+
     def _validate_target_column(
         self,
         schema_info: Dict[str, Any],
@@ -167,11 +167,11 @@ class PreprocessingValidator:
             raise PreprocessingValidationError(
                 f"Invalid target column in schema: {target_col}"
             )
-        
+
         problem_type = schema_info.get("global_problem_type")
         if not problem_type:
             raise PreprocessingValidationError("Problem type not set in schema")
-        
+
         if problem_type not in [
             "classification_binary",
             "classification_multiclass",
@@ -182,9 +182,9 @@ class PreprocessingValidator:
             raise PreprocessingValidationError(
                 f"Unknown problem type: {problem_type}"
             )
-        
+
         logger.debug("Target validation: column=%s, type=%s", target_col, problem_type)
-    
+
     def _validate_feature_selection(
         self,
         plan: Dict[str, Any],
@@ -197,13 +197,13 @@ class PreprocessingValidator:
             results["warnings"].append(
                 f"Feature selection top_k={top_k} very low; may drop too many features"
             )
-        
+
         detected_types = []
         for ds in schema_info.get("per_dataset", []):
             detected_types.extend(ds.get("detected_columns", {}).keys())
-        
+
         logger.debug("Feature selection: detected types=%s", set(detected_types))
-    
+
     def _validate_encoding_kwargs(
         self,
         plan: Dict[str, Any],
@@ -217,7 +217,7 @@ class PreprocessingValidator:
             results["warnings"].append(
                 f"Text max_length={max_len} unusual (typical: 128-512)"
             )
-        
+
         # Image validation
         img_plan = plan.get("modality", {}).get("image", {})
         img_size = img_plan.get("image_size", [224, 224])
@@ -225,7 +225,7 @@ class PreprocessingValidator:
             results["warnings"].append(
                 f"Image size={img_size} unusual (typical: 224 or 384)"
             )
-        
+
         logger.debug(
             "Encoding validation: text_max_len=%s, image_size=%s",
             max_len,
@@ -242,42 +242,42 @@ def validate_preprocessor_consistency(
     """
     FIX-6: Validate that all preprocessors are initialized and consistent
     with schema before Phase 5 training begins.
-    
+
     Parameters
     ----------
     tabular_prep : TabularPreprocessor | None
     text_prep : TextPreprocessor | None
     image_prep : ImagePreprocessor | None
     schema_info : Dict from Phase 2
-    
+
     Returns
     -------
     bool
         True if all active preprocessors are valid.
-        
+
     Raises
     ------
     PreprocessingValidationError
         If preprocessor state is inconsistent with schema.
     """
     schema_mods = set(schema_info.get("global_modalities", []))
-    
+
     # Check each preprocessor against schema
     if "tabular" in schema_mods and tabular_prep is None:
         raise PreprocessingValidationError(
             "Schema expects tabular modality but tabular_prep is None"
         )
-    
+
     if "text" in schema_mods and text_prep is None:
         raise PreprocessingValidationError(
             "Schema expects text modality but text_prep is None"
         )
-    
+
     if "image" in schema_mods and image_prep is None:
         raise PreprocessingValidationError(
             "Schema expects image modality but image_prep is None"
         )
-    
+
     # Verify preprocessors have required methods
     for prep, name in [(tabular_prep, "tabular"), (text_prep, "text"), (image_prep, "image")]:
         if prep is not None:
@@ -287,6 +287,6 @@ def validate_preprocessor_consistency(
                     raise PreprocessingValidationError(
                         f"{name} preprocessor missing method: {method}"
                     )
-    
+
     logger.info("FIX-6: All preprocessors validated and consistent with schema")
     return True

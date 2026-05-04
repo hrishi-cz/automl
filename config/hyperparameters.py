@@ -9,7 +9,6 @@ that Phase 5 uses to call ``trial.suggest_*`` during HPO.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional

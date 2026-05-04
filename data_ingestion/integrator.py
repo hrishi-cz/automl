@@ -6,7 +6,7 @@ PURPOSE (FIX-4 Part 3):
     1. Detect modalities (auto) + encode (embeddings)
     2. Validate predictability (RF scoring)
     3. Return consolidated metadata for inference
-  
+
   Replaces separate SIFT/OCAM/TF-IDF paths with unified
   modality detection → encoding → validation pipeline.
 
@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 class ModalityMetadata:
     """
     Structured output of Integrator: embeddings + validation scores.
-    
+
     Attributes
     ----------
     modality_name : str
@@ -81,16 +81,16 @@ class ModalityMetadata:
     is_valid: bool = False
     detection_method: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def final_score(self, weights: Optional[Dict[str, float]] = None) -> float:
         """
         Recompute final predictability score (same as UniversalTargetValidator).
-        
+
         Parameters
         ----------
         weights : Optional[Dict[str, float]]
             Override default weights.
-        
+
         Returns
         -------
         float
@@ -103,7 +103,7 @@ class ModalityMetadata:
             "noise_robustness": 0.15,
             "feature_importance": 0.10,
         }
-        
+
         score = (
             w["predictability"] * self.predictability_score +
             w["complementarity"] * self.complementarity_score +
@@ -111,9 +111,9 @@ class ModalityMetadata:
             w["noise_robustness"] * self.noise_robustness_score +
             w["feature_importance"] * self.feature_importance_score
         )
-        
+
         return float(np.clip(score, 0.0, 1.0))
-    
+
     def __repr__(self) -> str:
         """Pretty print ModalityMetadata."""
         return (
@@ -128,13 +128,13 @@ class ModalityMetadata:
 class Integrator:
     """
     Unified modality pipeline: detect + encode + validate.
-    
+
     This is the orchestrator that:
       1. Auto-detects modalities from raw data
       2. Encodes each modality into embeddings
       3. Validates each modality's predictability
       4. Returns consolidated metadata
-    
+
     Attributes
     ----------
     encoder : ModalityEncoder
@@ -144,7 +144,7 @@ class Integrator:
     min_predictability : float
         Min threshold for is_valid (default 0.3).
     """
-    
+
     def __init__(
         self,
         min_predictability: float = 0.3,
@@ -152,7 +152,7 @@ class Integrator:
     ):
         """
         Initialize Integrator.
-        
+
         Parameters
         ----------
         min_predictability : float
@@ -183,7 +183,7 @@ class Integrator:
             "Integrator initialized: min_predictability=%.3f",
             min_predictability,
         )
-    
+
     def detect_modality(
         self,
         data: Any,
@@ -191,14 +191,14 @@ class Integrator:
     ) -> Optional[str]:
         """
         Auto-detect modality from raw data.
-        
+
         Parameters
         ----------
         data : Any
             Raw data (list of strings, PIL images, numpy arrays, etc.).
         field_name : str
             Name of field (optional context).
-        
+
         Returns
         -------
         Optional[str]
@@ -207,7 +207,7 @@ class Integrator:
         """
         # Delegate to encoder
         return self.encoder.detect_modality(data, field_name=field_name)
-    
+
     def process_single_modality(
         self,
         raw_data: Any,
@@ -218,7 +218,7 @@ class Integrator:
     ) -> ModalityMetadata:
         """
         End-to-end: detect + encode + validate a single modality.
-        
+
         Parameters
         ----------
         raw_data : Any
@@ -229,12 +229,12 @@ class Integrator:
             Target variable for validation (optional).
         task_type : str
             "regression" or "classification"
-        
+
         Returns
         -------
         ModalityMetadata
             Complete metadata: embeddings + scores.
-        
+
         Raises
         ------
         ValueError
@@ -249,7 +249,7 @@ class Integrator:
                     "process_single_modality: could not auto-detect modality"
                 )
             logger.info("Auto-detected modality: %s", modality)
-        
+
         # 2. Encode to embeddings
         try:
             try:
@@ -294,16 +294,16 @@ class Integrator:
                 )
             logger.error("process_single_modality: encoding failed: %s", e)
             raise ValueError(f"Encoding failed for {modality}: {e}")
-        
+
         logger.info(
             "Encoded %s: embeddings shape = %s, encoder = %s",
             modality, embeddings.shape, encoder_name,
         )
-        
+
         # 3. Validate (if y provided)
         scores = {}
         is_valid = True
-        
+
         if y is not None and len(y) == embeddings.shape[0]:
             try:
                 # Use validator's components directly
@@ -316,7 +316,7 @@ class Integrator:
                 feat = self.validator._check_feature_importance(
                     embeddings, y, task_type=task_type
                 )
-                
+
                 scores = {
                     "predictability": pred,
                     "complementarity": comp,
@@ -324,26 +324,26 @@ class Integrator:
                     "noise_robustness": noise,
                     "feature_importance": feat,
                 }
-                
+
                 # Final score
                 final = (
                     0.40 * pred + 0.20 * comp + 0.15 * degen +
                     0.15 * noise + 0.10 * feat
                 )
-                
+
                 is_valid = final >= self.min_predictability
-                
+
                 logger.info(
                     "Validation %s: final_score=%.3f, is_valid=%s",
                     modality, final, is_valid,
                 )
-            
+
             except Exception as e:
                 logger.warning(
                     "process_single_modality: validation failed: %s", e
                 )
                 is_valid = False
-        
+
         # 4. Build metadata
         detection_method = (
             "forced"
@@ -369,7 +369,7 @@ class Integrator:
                 "resolved_modality": modality,
             },
         )
-        
+
         return metadata
 
     @staticmethod
@@ -414,7 +414,7 @@ class Integrator:
             return "dtype"
 
         return "auto"
-    
+
     def process_multimodal(
         self,
         raw_data_dict: Dict[str, Any],
@@ -424,7 +424,7 @@ class Integrator:
     ) -> Dict[str, ModalityMetadata]:
         """
         Process all modalities from a multimodal dataset.
-        
+
         Parameters
         ----------
         raw_data_dict : Dict[str, Any]
@@ -435,7 +435,7 @@ class Integrator:
             Target variable for validation.
         task_type : str
             "regression" or "classification"
-        
+
         Returns
         -------
         Dict[str, ModalityMetadata]
@@ -443,10 +443,10 @@ class Integrator:
         """
         modalities = modalities or {}
         results = {}
-        
+
         for field_name, raw_data in raw_data_dict.items():
             modality = modalities.get(field_name)
-            
+
             try:
                 meta = self.process_single_modality(
                     raw_data=raw_data,
@@ -460,14 +460,14 @@ class Integrator:
                     "Processed field %s → modality %s, score %.3f",
                     field_name, meta.modality_name, meta.final_score(),
                 )
-            
+
             except Exception as e:
                 logger.error(
                     "process_multimodal failed for field %s: %s", field_name, e
                 )
                 # Skip this modality
                 continue
-        
+
         return results
 
 
@@ -478,7 +478,7 @@ def process_dataset(
 ) -> Dict[str, ModalityMetadata]:
     """
     Convenience function: process entire dataset at once.
-    
+
     Parameters
     ----------
     raw_data_dict : Dict[str, Any]
@@ -487,7 +487,7 @@ def process_dataset(
         Target variable.
     task_type : str
         "regression" or "classification"
-    
+
     Returns
     -------
     Dict[str, ModalityMetadata]

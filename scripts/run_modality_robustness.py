@@ -23,7 +23,6 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import numpy as np
 import torch
 
 # Ensure project root is on sys.path
@@ -96,7 +95,6 @@ def _evaluate_with_mask(
     model.eval()
     all_preds = []
     all_targets = []
-    total_loss = 0.0
     n_batches = 0
 
     with torch.no_grad():

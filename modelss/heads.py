@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-from typing import List, Optional
+from typing import List
 
 
 class MLPHead(nn.Module):

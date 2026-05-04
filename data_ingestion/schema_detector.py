@@ -23,8 +23,6 @@ _TARGET_SUFFIX_RE = _re_import.compile(
 
 
 from data_ingestion.schema import GlobalSchema, IndividualSchema
-from data_ingestion.integrator import Integrator
-from data_ingestion.data_bridge import materialize_sample
 from data_ingestion.semantic_analyzer import SemanticAnalyzer
 from data_ingestion.xs3_target_selector import XS3TargetSelector
 
@@ -95,14 +93,14 @@ class COGMASchemaDetector:
     def _build_global_schema(self, per_dataset_results: List[Dict[str, Any]]) -> GlobalSchema:
         """Aggregate per-dataset results into a GlobalSchema."""
         global_modalities = sorted({m for s in per_dataset_results for m in s.get("modalities", [])})
-        
+
         if per_dataset_results:
             primary_target = max(per_dataset_results, key=lambda s: s.get("confidence", 0.0)).get("target_column", "Unknown")
             detection_confidence = float(np.mean([s.get("confidence", 0.0) for s in per_dataset_results]))
         else:
             primary_target = "Unknown"
             detection_confidence = 0.0
-            
+
         fusion_ready = len(global_modalities) > 1
 
         global_schema = GlobalSchema(
@@ -1637,7 +1635,6 @@ class COGMASchemaDetector:
         suffix_score_val = float(last_part in self.TARGET_SUFFIX_KEYWORDS)
         keyword_score = min(any_match + suffix_score_val * 0.5, 1.0)
         json_score = 0.0
-        binary_penalty = 0.0
         n_unique = 0
         try:
             n_unique = series.nunique(dropna=True)
@@ -1647,7 +1644,7 @@ class COGMASchemaDetector:
                     json_score = float(sample.str.contains(r"\{.*\}", na=False).mean())
                     vals = set(sample.str.lower().unique())
                     if vals <= self._BINARY_ATTRIBUTE_VALUES and n_unique == 2:
-                        binary_penalty = 0.20
+                        pass
         except Exception:
             pass
 

@@ -678,7 +678,7 @@ class CandidateSelector:
         X_s, y_s = X_arr[idx], y_arr[idx]
 
         is_clf = "classification" in problem_type
-        
+
         from sklearn.model_selection import StratifiedKFold, KFold
 
         if is_clf:
@@ -717,14 +717,14 @@ class CandidateSelector:
                 import warnings
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    
+
                     for train_idx, val_idx in cv.split(X_s, y_s):
                         X_train, X_val = X_s[train_idx], X_s[val_idx]
                         y_train, y_val = y_s[train_idx], y_s[val_idx]
-                        
+
                         t0 = time.perf_counter()
                         model.fit(X_train, y_train)
-                        
+
                         if is_clf:
                             preds = model.predict(X_val)
                             from sklearn.metrics import accuracy_score
@@ -733,7 +733,7 @@ class CandidateSelector:
                             preds = model.predict(X_val)
                             from sklearn.metrics import r2_score
                             score = float(max(r2_score(y_val, preds), 0.0))
-                            
+
                         latencies.append((time.perf_counter() - t0) * 1000)
                         scores.append(score)
 
@@ -741,7 +741,7 @@ class CandidateSelector:
                 mean_score = float(np.mean(scores))
                 unc_score = float(np.std(scores))
                 mean_lat = float(np.mean(latencies))
-                
+
                 results[name] = {
                     "val_score": mean_score,
                     "uncertainty": unc_score,
@@ -820,7 +820,7 @@ class CandidateSelector:
                     "deberta": "microsoft/deberta-v3-small"
                 }
                 hf_id = hf_map.get(name, hf_map["minilm"])
-                
+
                 device = "cuda" if torch.cuda.is_available() else "cpu"
                 tokenizer = AutoTokenizer.from_pretrained(hf_id)
                 model = AutoModel.from_pretrained(hf_id).to(device)
@@ -840,13 +840,13 @@ class CandidateSelector:
                         sum_mask = torch.clamp(masks.sum(1), min=1e-9)
                         pool = sum_embeddings / sum_mask
                         embeddings.append(pool.cpu().numpy())
-                
+
                 X_emb = np.vstack(embeddings)
-                
+
                 # Linear Probe using Ridge
                 from sklearn.linear_model import RidgeClassifier, Ridge
                 from sklearn.metrics import accuracy_score, r2_score
-                
+
                 scores = []
                 for train_idx, val_idx in cv.split(X_emb, y_s):
                     X_tr, X_va = X_emb[train_idx], X_emb[val_idx]
@@ -855,10 +855,10 @@ class CandidateSelector:
                     probe_mod.fit(X_tr, y_tr)
                     preds = probe_mod.predict(X_va)
                     scores.append(accuracy_score(y_va, preds) if is_clf else max(r2_score(y_va, preds), 0.0))
-                
+
                 mean_score = float(np.mean(scores))
                 unc_score = float(np.std(scores))
-                
+
                 results[name] = {
                     "val_score": mean_score,
                     "uncertainty": unc_score,
@@ -866,7 +866,7 @@ class CandidateSelector:
                     "confidence": "HIGH (linear probe)"
                 }
                 logger.info("  text linear probe %s: score=%.4f (±%.4f)", name, mean_score, unc_score)
-                
+
                 # Cleanup VRAM aggressively
                 del model, tokenizer, embeddings, X_emb
                 if torch.cuda.is_available(): torch.cuda.empty_cache()
@@ -889,7 +889,7 @@ class CandidateSelector:
         if max_unc > 0.15 and len(texts) > max_rows and not _retried:
             logger.info("  [Adaptive Budget] Text Uncertainty %.4f > 0.15. Retrying with %d rows.", max_unc, max_rows * 2)
             return self.quick_probe_text(candidates, texts, y, problem_type, max_rows * 2, _retried=True)
-            
+
         return results
 
     def quick_probe_image(
@@ -922,7 +922,7 @@ class CandidateSelector:
             name = cand["name"]
             latency_ms_est = cand.get("params_m", 25) * 2.0
             base_acc = {"mobilenet": 0.74, "efficientnet": 0.79, "resnet50": 0.78, "convnext": 0.82}.get(name, 0.75)
-            
+
             results[name] = {
                 "val_score": base_acc,
                 "uncertainty": 0.09 + 500 / max(1, n),
@@ -934,9 +934,9 @@ class CandidateSelector:
                 import torch
                 from torchvision import models, transforms
                 from PIL import Image
-                
+
                 device = "cuda" if torch.cuda.is_available() else "cpu"
-                
+
                 # Fetch pre-trained model
                 if name == "mobilenet":
                     model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
@@ -970,18 +970,18 @@ class CandidateSelector:
                                 batch_imgs.append(tfs(Image.open(p).convert('RGB')))
                             except Exception:
                                 batch_imgs.append(torch.zeros(3, 224, 224))
-                        
+
                         inputs = torch.stack(batch_imgs).to(device)
                         out = model(inputs)
                         if out.dim() == 4: # Spatial maps (e.g. from some networks before pooling)
                             out = torch.nn.functional.adaptive_avg_pool2d(out, (1, 1)).flatten(1)
                         embeddings.append(out.cpu().numpy())
-                
+
                 X_emb = np.vstack(embeddings)
-                
+
                 from sklearn.linear_model import RidgeClassifier, Ridge
                 from sklearn.metrics import accuracy_score, r2_score
-                
+
                 scores = []
                 for train_idx, val_idx in cv.split(X_emb, y_s):
                     X_tr, X_va = X_emb[train_idx], X_emb[val_idx]
@@ -990,10 +990,10 @@ class CandidateSelector:
                     probe_mod.fit(X_tr, y_tr)
                     preds = probe_mod.predict(X_va)
                     scores.append(accuracy_score(y_va, preds) if is_clf else max(r2_score(y_va, preds), 0.0))
-                
+
                 mean_score = float(np.mean(scores))
                 unc_score = float(np.std(scores))
-                
+
                 results[name] = {
                     "val_score": mean_score,
                     "uncertainty": unc_score,
@@ -1001,7 +1001,7 @@ class CandidateSelector:
                     "confidence": "HIGH (linear probe)"
                 }
                 logger.info("  image linear probe %s: score=%.4f (±%.4f)", name, mean_score, unc_score)
-                
+
                 del model, embeddings, X_emb
                 if torch.cuda.is_available(): torch.cuda.empty_cache()
 
@@ -1012,7 +1012,7 @@ class CandidateSelector:
         if max_unc > 0.15 and len(image_paths) > max_rows and not _retried:
             logger.info("  [Adaptive Budget] Image Uncertainty %.4f > 0.15. Retrying with %d rows.", max_unc, max_rows * 2)
             return self.quick_probe_image(candidates, image_paths, y, problem_type, max_rows * 2, _retried=True)
-            
+
         return results
 
     def _import_model(
@@ -1078,7 +1078,7 @@ class CandidateSelector:
         """
         ranked: Dict[str, List[RankedModel]] = {}
         dataset_size = schema_info.get("total_samples", 10_000)
-        
+
         tab_scores   = probe_scores.get("tabular", {})
         text_scores  = probe_scores.get("text", {})
         image_scores = probe_scores.get("image", {})
@@ -1095,24 +1095,24 @@ class CandidateSelector:
                 mem = cand.get("vram_mb", 0.0)
                 unc = p.get("uncertainty", 0.0)
                 conf = p.get("confidence", "NONE")
-                
+
                 # Normalize latency, memory, uncertainty to [0,1]
                 norm_acc = acc
                 norm_lat = min(lat / 5000.0, 1.0)
                 norm_mem = min(mem / 8000.0, 1.0)
                 norm_unc = min(unc / 0.20, 1.0) # Assume 20% std dev is absolute worst case
-                
+
                 final = norm_acc - (lambda_latency * norm_lat) - (mu_memory * norm_mem) - (gamma_unc * norm_unc)
-                
+
                 if dataset_size < 10000 and name in ("xgboost", "lightgbm", "random_forest"):
                     final += 0.05
-                    
+
                 if meta_recommendations and name in meta_recommendations:
                     final += 0.15
                     conf = "META + " + conf
                 has_probe = conf != "NONE"
                 probe_state = "probed" if has_probe else "no_probe_data"
-                    
+
                 rationale = (
                     f"{probe_state} [{conf}]: acc={acc:.4f} unc=±{unc:.4f} lat={lat:.0f}ms mem={mem:.1f}MB  "
                     f"final_score={final:.4f} (acc-{lambda_latency}*lat-{mu_memory}*mem-{gamma_unc}*unc)"
@@ -1137,21 +1137,21 @@ class CandidateSelector:
                 mem = cand.get("vram_mb", 0.0)
                 unc = p.get("uncertainty", 0.0)
                 conf = p.get("confidence", "NONE")
-                
+
                 norm_acc = acc
                 norm_lat = min(lat / 5000.0, 1.0)
                 norm_mem = min(mem / 8000.0, 1.0)
                 norm_unc = min(unc / 0.20, 1.0)
-                
+
                 final = norm_acc - (lambda_latency * norm_lat) - (mu_memory * norm_mem) - (gamma_unc * norm_unc)
-                
+
                 has_probe = conf != "NONE"
 
                 if meta_recommendations and name in meta_recommendations:
                     final += 0.15
                     conf = "META + " + conf
                 probe_state = "probed" if has_probe else "no_probe_data"
-                
+
                 rationale = (
                     f"{probe_state} [{conf}]: acc={acc:.4f} unc=±{unc:.4f} lat={lat:.0f}ms mem={mem:.1f}MB  "
                     f"final_score={final:.4f} (acc-{lambda_latency}*lat-{mu_memory}*mem-{gamma_unc}*unc)"
@@ -1176,21 +1176,21 @@ class CandidateSelector:
                 mem = cand.get("vram_mb", 0.0)
                 unc = p.get("uncertainty", 0.0)
                 conf = p.get("confidence", "NONE")
-                
+
                 norm_acc = acc
                 norm_lat = min(lat / 5000.0, 1.0)
                 norm_mem = min(mem / 8000.0, 1.0)
                 norm_unc = min(unc / 0.20, 1.0)
-                
+
                 final = norm_acc - (lambda_latency * norm_lat) - (mu_memory * norm_mem) - (gamma_unc * norm_unc)
-                
+
                 has_probe = conf != "NONE"
 
                 if meta_recommendations and name in meta_recommendations:
                     final += 0.15
                     conf = "META + " + conf
                 probe_state = "probed" if has_probe else "no_probe_data"
-                
+
                 rationale = (
                     f"{probe_state} [{conf}]: acc={acc:.4f} unc=±{unc:.4f} lat={lat:.0f}ms mem={mem:.1f}MB  "
                     f"final_score={final:.4f} (acc-{lambda_latency}*lat-{mu_memory}*mem-{gamma_unc}*unc)"
@@ -1386,17 +1386,17 @@ class CandidateSelector:
                 user_mod = user_selection.get(mod)
                 if not user_mod:
                     continue
-                
+
                 # Find the user's model in the FULL ranked list to check cost/feasibility
                 user_cand = next((m for m in ranked.get(mod, []) if m.name == user_mod), None)
                 if not user_cand:
                     logger.warning(f"User selected model '{user_mod}' for modality '{mod}' not found in candidates.")
                     continue
-                
+
                 # Get the auto candidate to calculate tradeoff
                 auto_name = locals().get(f"auto_{mod}")
                 auto_cand = next((m for m in ranked.get(mod, []) if m.name == auto_name), None)
-                
+
                 # Check JIT feasibility
                 if gpu_mem > 0 and user_cand.vram_mb > vram_mb_limit:
                     override_report = {
@@ -1411,18 +1411,18 @@ class CandidateSelector:
                         f"Required VRAM: {user_cand.vram_mb:.1f}MB, Budget: {vram_mb_limit:.1f}MB."
                     )
                     continue
-                
+
                 # Accepted
                 if mod == "tabular": final_tabular = user_mod
                 elif mod == "text": final_text = user_mod
                 elif mod == "image": final_image = user_mod
                 selection_type = "manual_override"
-                
+
                 # Calculate tradeoff (positive delta = user model is higher)
                 acc_delta = (user_cand.val_score - auto_cand.val_score) if auto_cand else 0.0
                 lat_delta = (user_cand.latency_ms - auto_cand.latency_ms) if auto_cand else 0.0
                 mem_delta = (user_cand.vram_mb - auto_cand.vram_mb) if auto_cand else 0.0
-                
+
                 override_report = {
                     "status": "accepted",
                     "reason": "valid",
@@ -1579,16 +1579,16 @@ class CandidateSelector:
     ) -> List[Dict[str, Any]]:
         """
         Unified API for /select-model endpoint that matches AdvancedModelSelector interface.
-        
+
         This wraps the full CandidateSelector pipeline (generate → rank → select_final)
         to provide model recommendations consistent with Phase 4 training pipeline.
-        
-        When actual data is provided (data dict with schema, X, y, text, image), 
-        performs real probes. Otherwise, uses heuristic estimation based on dataset 
+
+        When actual data is provided (data dict with schema, X, y, text, image),
+        performs real probes. Otherwise, uses heuristic estimation based on dataset
         size, modalities, and avg_tokens.
-        
+
         Returns list of dicts matching Streamlit frontend JSON contract::
-        
+
             {
               "name": "<ViT-Base + BERT-base + TabNet>",
               "image_encoder": "<name or null>",
@@ -1653,7 +1653,7 @@ class CandidateSelector:
 
         # 2. Quick probes (only if data provided; otherwise use heuristics)
         probe_scores: Dict[str, Dict[str, Any]] = {"tabular": {}, "text": {}, "image": {}}
-        
+
         if data and data.get("X") is not None and candidates.get("tabular"):
             try:
                 X, y = data["X"], data["y"]

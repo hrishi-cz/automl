@@ -21,15 +21,15 @@ logger = logging.getLogger(__name__)
 class SessionManager:
     """
     High-level session management service.
-    
+
     Thin CRUD wrapper over ContextDatabase.
     Use ExecutionContext (from core.execution_context) for session state.
     Endpoint behavior belongs in route handlers, not this class.
     """
-    
+
     _instance = None
     _lock = threading.Lock()
-    
+
     def __new__(cls):
         """Singleton pattern."""
         if cls._instance is None:
@@ -38,15 +38,15 @@ class SessionManager:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         """Initialize session manager."""
         if self._initialized:
             return
-        
+
         self._initialized = True
         logger.info("SessionManager initialized (using ContextDatabase)")
-    
+
     def create_session(
         self,
         session_id: Optional[str] = None,
@@ -56,13 +56,13 @@ class SessionManager:
     ) -> ExecutionContext:
         """
         Create a new session.
-        
+
         Args:
             session_id: Optional session ID (auto-generated if not provided)
             user_id: Optional user identifier
             project_name: Optional project name
             description: Optional description
-        
+
         Returns:
             ExecutionContext: Created session context
         """
@@ -75,23 +75,23 @@ class SessionManager:
                 'description': description
             }
         )
-        
+
         # Persist to database
         ctx.revision = context_db.save_context(
             ctx.to_dict(),
             expected_revision=0,
         )
-        
+
         logger.info("Created session %s", ctx.session_id)
         return ctx
-    
+
     def get_session(self, session_id: str) -> Optional[ExecutionContext]:
         """
         Retrieve a session by ID.
-        
+
         Args:
             session_id: Session identifier
-        
+
         Returns:
             ExecutionContext if found, None otherwise
         """
@@ -99,7 +99,7 @@ class SessionManager:
         if data:
             return ExecutionContext.from_dict(data)
         return None
-    
+
     def get_or_create_session(self, session_id: str, **kwargs) -> ExecutionContext:
         """Return existing session context or create a new one atomically.
 
@@ -116,7 +116,7 @@ class SessionManager:
     def update_session(self, ctx: ExecutionContext) -> None:
         """
         Update an existing session.
-        
+
         Args:
             ctx: ExecutionContext to update
         """
@@ -127,7 +127,7 @@ class SessionManager:
             expected_revision=expected_revision,
         )
         logger.debug("Updated session %s", ctx.session_id)
-    
+
     def list_sessions(
         self,
         user_id: Optional[str] = None,
@@ -137,13 +137,13 @@ class SessionManager:
     ) -> List[Dict[str, Any]]:
         """
         List all sessions (with optional filtering).
-        
+
         Args:
             user_id: Optional user filter (not yet implemented in DB)
             status: Optional status filter (not yet implemented in DB)
             limit: Maximum number of sessions to return
             offset: Offset for pagination
-        
+
         Returns:
             List of session summaries
         """
@@ -177,14 +177,14 @@ class SessionManager:
             )
 
         return summaries
-    
+
     def close_session(self, session_id: str) -> bool:
         """
         Close a session (mark as complete).
-        
+
         Args:
             session_id: Session to close
-        
+
         Returns:
             True if closed successfully, False if session not found
         """
@@ -192,14 +192,14 @@ class SessionManager:
         if success:
             logger.info("Closed session %s", session_id)
         return success
-    
+
     def delete_session(self, session_id: str) -> bool:
         """
         Delete a session permanently.
-        
+
         Args:
             session_id: Session to delete
-        
+
         Returns:
             True if deleted successfully
         """
@@ -207,7 +207,7 @@ class SessionManager:
         ctx = self.get_session(session_id)
         if not ctx:
             return False
-        
+
         # Delete all associated profiles
         for dataset_id in ctx.active_dataset_ids:
             try:
@@ -215,14 +215,14 @@ class SessionManager:
                 # TODO: Add delete_profile method to context_db if needed
             except Exception:
                 pass
-        
+
         # Mark as closed (for now - can add hard delete later)
         return self.close_session(session_id)
-    
+
     def update_session_context(self, session_id: str, ctx: ExecutionContext) -> None:
         """
         Update session context (alias for update_session).
-        
+
         Args:
             session_id: Session ID (must match ctx.session_id)
             ctx: ExecutionContext to update
@@ -233,31 +233,31 @@ class SessionManager:
                 f"does not match context session_id={ctx.session_id}"
             )
         self.update_session(ctx)
-    
+
     def remove_dataset_from_session(self, session_id: str, dataset_id: str) -> bool:
         """
         Remove a dataset from a session.
-        
+
         Args:
             session_id: Session ID
             dataset_id: Dataset to remove
-        
+
         Returns:
             True if removed successfully
         """
         ctx = self.get_session(session_id)
         if not ctx:
             return False
-        
+
         # Remove from active datasets
         if dataset_id in ctx.active_dataset_ids:
             ctx.active_dataset_ids.remove(dataset_id)
             self.update_session(ctx)
             logger.info("Removed dataset %s from session %s", dataset_id, session_id)
             return True
-        
+
         return False
-    
+
     @property
     def db(self):
         """Access to underlying ContextDatabase (for backward compatibility)."""

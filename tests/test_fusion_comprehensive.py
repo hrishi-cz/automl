@@ -20,8 +20,6 @@ Test matrix:
 
 import pytest
 import torch
-import torch.nn as nn
-from typing import List, Dict
 
 # Import fusion modules
 from models.fusion import (
@@ -230,8 +228,8 @@ class TestGraphFusion:
     def test_diversity_loss_computation(self, embeddings_triple):
         """Diversity loss should compute correctly from head outputs"""
         fusion = GraphFusion(dim=512, num_modalities=3, heads=4, input_dims=[768, 2048, 32])
-        output = fusion.forward(embeddings_triple)
-        
+        fusion.forward(embeddings_triple)
+
         # Access cached head outputs
         if hasattr(fusion, 'last_head_outputs') and fusion.last_head_outputs:
             div_loss = diversity_loss(fusion.last_head_outputs)
@@ -379,7 +377,7 @@ class TestEdgeCases:
             UncertaintyFusion([768, 2048], latent_dim=512),
             UncertaintyGraphFusion([768, 2048], latent_dim=512, heads=4),
         ]
-        
+
         for fusion in fusions:
             output = fusion.forward(embeddings_batch1)
             assert output.shape == (1, 512)
@@ -476,7 +474,7 @@ class TestIntegration:
             "uncertainty": UncertaintyFusion([768, 2048, 32], latent_dim=512),
             "uncertainty_graph": UncertaintyGraphFusion([768, 2048, 32], latent_dim=512, heads=4),
         }
-        
+
         # Forward pass through each fusion
         for name, fusion in fusions.items():
             output = fusion.forward(embeddings_triple)
@@ -487,13 +485,13 @@ class TestIntegration:
         """Multiple forward passes should be consistent"""
         fusion = AttentionFusion([768, 2048], latent_dim=512)
         fusion.eval()  # Eval mode
-        
+
         outputs = []
         for _ in range(3):
             with torch.no_grad():
                 output = fusion.forward(embeddings_double)
                 outputs.append(output)
-        
+
         # All outputs should be identical in eval mode
         for i in range(1, len(outputs)):
             assert torch.allclose(outputs[0], outputs[i], atol=1e-6)

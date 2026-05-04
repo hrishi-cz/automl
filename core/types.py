@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import torch
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from enum import Enum
 
 
 class Phase(Enum):
     """
     Workflow phases in the APEX/AutoVision+ pipeline.
-    
+
     The 7-phase architecture:
     1. DATA_INGESTION: Multi-source async data loading
     2. SCHEMA_DETECTION: COGMA 6-stage column type inference
@@ -40,11 +40,11 @@ class Phase(Enum):
 class TrainingConfig:
     """
     Configuration for complete training workflow.
-    
+
     This dataclass encapsulates all parameters needed to execute
     the 7-phase training pipeline, from data ingestion through
     model registry.
-    
+
     Attributes
     ----------
     dataset_sources : List[str]
@@ -78,10 +78,10 @@ class TrainingConfig:
 class ModelSelectionResult:
     """
     Result from Phase 4 model selection.
-    
+
     Captures the architecture decisions made by the AutoML engine,
     including encoder choices, fusion strategy, and hyperparameters.
-    
+
     Attributes
     ----------
     image_encoder : str | None
@@ -121,10 +121,10 @@ class ModelSelectionResult:
 class TrainingMetrics:
     """
     Training metrics from Phase 5.
-    
+
     Captures per-epoch metrics during model training. Supports both
     regression (loss only) and classification (loss + accuracy + F1).
-    
+
     Attributes
     ----------
     epoch : int

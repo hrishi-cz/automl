@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class XAIEngine:
     """
     Post-training XAI integration using SHAP.
-    Computes global feature importances for tabular data and 
+    Computes global feature importances for tabular data and
     generates structured explanations.
     """
     def __init__(self, model_id: str, device: str = "cpu"):
@@ -21,7 +21,7 @@ class XAIEngine:
         self.model_id = model_id
         self.device = torch.device(device)
         self.engine = MultimodalInferenceEngine(model_id)
-        
+
     def explain_tabular(self, df_background: pd.DataFrame, df_test: pd.DataFrame) -> Dict[str, Any]:
         """
         Compute SHAP values for tabular features using DeepExplainer.
@@ -33,16 +33,16 @@ class XAIEngine:
 
         if not self.engine.tabular_prep:
             return {"error": "No tabular preprocessor found for this model."}
-            
+
         try:
             # 1. Prepare background data
             tabular_bg = self.engine.tabular_prep.transform(df_background)
             tabular_bg_tensor = torch.tensor(tabular_bg, dtype=torch.float32).to(self.device).requires_grad_(True)
-            
+
             # 2. Prepare test data
             tabular_test = self.engine.tabular_prep.transform(df_test)
             tabular_test_tensor = torch.tensor(tabular_test, dtype=torch.float32).to(self.device).requires_grad_(True)
-            
+
             # 3. Model wrapper that locks non-tabular modalities
             def model_wrapper(x):
                 b = {"tabular": x}
@@ -51,7 +51,7 @@ class XAIEngine:
                     b["text_pooled"] = torch.zeros(x.shape[0], self.engine.input_dims["text_pooled"]).to(x.device)
                 if "image_pooled" in self.engine.input_dims:
                     b["image_pooled"] = torch.zeros(x.shape[0], self.engine.input_dims["image_pooled"]).to(x.device)
-                
+
                 out = self.engine._head(b)
                 # Ensure correct shape for SHAP explainer
                 if self.engine.problem_type == "classification_binary":
@@ -61,11 +61,11 @@ class XAIEngine:
                 elif self.engine.problem_type.startswith("classification"):
                     return torch.softmax(out, dim=-1)
                 return out.squeeze(-1).unsqueeze(-1)
-                
+
             # 4. Compute SHAP values
             explainer = shap.DeepExplainer(model_wrapper, tabular_bg_tensor)
             shap_values = explainer.shap_values(tabular_test_tensor)
-            
+
             # 5. Format Output
             feature_names = self.engine.tabular_prep.get_feature_names_out()
             if isinstance(shap_values, list): # Multi-class
@@ -75,7 +75,7 @@ class XAIEngine:
             else:
                 importances = np.abs(shap_values).mean(0)
                 raw_values = shap_values.tolist()
-            
+
             ranking = sorted(zip(feature_names, importances), key=lambda x: x[1], reverse=True)
             return {
                 "method": "SHAP (DeepExplainer)",
@@ -83,7 +83,7 @@ class XAIEngine:
                 "shap_values_raw": raw_values,
                 "feature_names": feature_names.tolist() if isinstance(feature_names, np.ndarray) else list(feature_names)
             }
-            
+
         except Exception as e:
             logger.error(f"XAIEngine tabular explain failed: {e}", exc_info=True)
             return {"error": f"SHAP explanation failed: {str(e)}"}
@@ -96,12 +96,12 @@ class XAIEngine:
             import shap
             if "text_pooled" not in self.engine.input_dims or not self.engine._text_encoder:
                 return {"error": "No text feature found in model."}
-                
+
             text_bg = self.engine._extract_text_values(df_background.to_dict('records'))
             text_test = self.engine._extract_text_values(df_test.to_dict('records'))
             if not text_bg or not text_test:
                 return {"error": "Missing text data."}
-                
+
             # For pure text SHAP we would need a HuggingFace explainer or similar
             # that operates on tokens. Since we just have text_pooled, we use DeepExplainer
             # on the pooled embeddings for global feature importance.
@@ -110,7 +110,7 @@ class XAIEngine:
                 bg_emb.requires_grad_(True)
                 test_emb = self.engine._text_encoder(text_test).to(self.device).detach()
                 test_emb.requires_grad_(True)
-                
+
             def text_wrapper(x):
                 b = {"text_pooled": x}
                 if "tabular" in self.engine.input_dims:
@@ -118,7 +118,7 @@ class XAIEngine:
                 if "image_pooled" in self.engine.input_dims:
                     b["image_pooled"] = torch.zeros(x.shape[0], self.engine.input_dims["image_pooled"]).to(x.device)
                 return self.engine._head(b)
-                
+
             explainer = shap.DeepExplainer(text_wrapper, bg_emb)
             shap_values = explainer.shap_values(test_emb)
             return {
@@ -198,10 +198,10 @@ class XAIExplainer:
     """
     Lightweight explainability layer for multimodal models during training.
     Generates artifacts that go directly into model registry metadata.
-    
+
     Usage in training_orchestrator.py Phase 5:
         from pipeline.xai_engine import XAIExplainer, generate_xai_artifacts
-        
+
         explainer = XAIExplainer(model, modalities=["tabular", "image", "text"])
         xai_artifacts = generate_xai_artifacts(model, batch, modalities)
         training_summary["xai"] = xai_artifacts
@@ -230,7 +230,7 @@ class XAIExplainer:
     def generate_artifacts(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate XAI artifacts from a sample batch.
-        
+
         Returns:
             {
                 "tabular": {"type": "shap", "values": [...], "feature_importance": [...]},
@@ -659,7 +659,7 @@ class XAIExplainer:
         """Extract fusion importance (weights)."""
         try:
             # Try to access fusion module
-            fusion = getattr(self.model.model if hasattr(self.model, 'model') else self.model, 
+            fusion = getattr(self.model.model if hasattr(self.model, 'model') else self.model,
                            "fusion", None)
 
             def _normalize(weights: Dict[str, float]) -> Dict[str, float]:
@@ -668,7 +668,7 @@ class XAIExplainer:
                 if total <= 0.0:
                     return {m: 1.0 / len(self.modalities) for m in self.modalities}
                 return {k: v / total for k, v in positive.items()}
-            
+
             if fusion is None:
                 # Default: equal weights for all modalities
                 weights = {m: 1.0 / len(self.modalities) for m in self.modalities}
@@ -746,12 +746,12 @@ def generate_xai_artifacts(
 ) -> Dict[str, Any]:
     """
     Generate XAI artifacts from a batch during training.
-    
+
     Call this in training_orchestrator.py Phase 5 after model training:
-    
+
         xai_artifacts = generate_xai_artifacts(model, sample_batch, modalities)
         training_summary["xai"] = xai_artifacts
-    
+
     Parameters
     ----------
     model : torch.nn.Module
@@ -760,7 +760,7 @@ def generate_xai_artifacts(
         Sample batch with "tabular", "image", "text", "target".
     modalities : list
         Active modalities.
-    
+
     Returns
     -------
     Dict with "tabular", "image", "text", "fusion" subkeys.

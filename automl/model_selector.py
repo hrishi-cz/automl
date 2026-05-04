@@ -14,9 +14,9 @@ New code should import ``AdvancedModelSelector`` directly::
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from automl.advanced_selector import AdvancedModelSelector, SelectionResult
+from automl.advanced_selector import AdvancedModelSelector
 
 logger = logging.getLogger(__name__)
 

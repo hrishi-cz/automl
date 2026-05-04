@@ -1,6 +1,5 @@
 """Tests for encoder-overrides and fusion override API endpoints."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 from api.run_api import app

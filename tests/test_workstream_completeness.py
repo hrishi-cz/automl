@@ -32,10 +32,8 @@ from __future__ import annotations
 
 import importlib
 import inspect
-import sys
 import types
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from typing import List
 
 import pytest
 import torch
@@ -424,10 +422,10 @@ class TestG25_ExtendedFusionMask:
             pytest.skip(f"{cls_name} not found in fusion module.")
         cls = getattr(mod, cls_name)
         try:
-            fuser = cls(dims, latent_dim=latent)
+            cls(dims, latent_dim=latent)
         except TypeError:
             try:
-                fuser = cls(dims)
+                cls(dims)
             except TypeError:
                 pytest.skip(f"Cannot construct {cls_name} with dims={dims}.")
         t_list = [torch.ones(2, d) for d in dims]

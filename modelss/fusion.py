@@ -647,7 +647,7 @@ def select_fusion_strategy(schema_info: dict) -> str:
 
     # Read cross-modal signals from GlobalSchema.multimodal_signals
     mm_signals = schema_info.get("multimodal_signals") or {}
-    alignment   = float(mm_signals.get("alignment_strength",   0.5) or 0.5)
+    float(mm_signals.get("alignment_strength",   0.5) or 0.5)
     comp_score  = float(mm_signals.get("complementarity_score", 0.0) or 0.0)
 
     if modset == {"image", "text"}:
